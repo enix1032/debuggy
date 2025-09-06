@@ -1,0 +1,55 @@
+{
+  "name": "@en32/debuggy",
+  "version": "1.0.1-refactored",
+  "description": "A simple debug logger.",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./global": {
+      "import": "./global.js"
+    }
+  },
+  "scripts": {
+    "build:node:min": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --minify",
+    "build:node:watch": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --watch",
+    "example:simple": "DEBUG=debuggy bun run --hot ./examples/simple.js",
+    "example:custom": "DEBUG=debuggy bun run --hot ./examples/custom.js",
+    "example:logger:debug": "DEBUG=debuggy bun run --hot ./examples/logger.js",
+    "example:logger": "bun run --hot ./examples/logger.js",
+    "example:simple:node": "DEBUG=debuggy nodemon ./examples/simple.js",
+    "example:server": "DEBUG=debuggy bun --hot ./examples/server/index.js",
+    "example:server:node": "DEBUG=debuggy nodemon ./examples/server/index.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "global.js",
+    "package.json"
+  ],
+  "keywords": [
+    "debug",
+    "logger",
+    "bun",
+    "node"
+  ],
+  "author": "Enix Ardiansyah",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.3",
+    "@en32/debuggy": "file:./../debuggy"
+  },
+  "dependencies": {
+    "@en32/logger": "link:./../logger"
+  },
+  "dependenciesMeta": {
+    "@en32/logger": {
+      "optional": true
+    }
+  }
+}
