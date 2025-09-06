@@ -2,7 +2,7 @@
 
 A simple, customizable, and lightweight debug logger for Node.js and Bun. It provides flexible logging with automatic file and line number detection, custom templates, and tag-based filtering.
 
-![Screenshot](https://raw.githubusercontent.com/enix1032/debuggy/refs/heads/dev/sc.jpg "deBuggy")
+![Screenshot](https://raw.githubusercontent.com/enix1032/debuggy/refs/heads/v2/debuggy.jpg "deBuggy")
 
 -----
 
@@ -24,9 +24,6 @@ You can install `@en32/debuggy` using npm, yarn, or Bun.
 ```bash
 # Using npm
 npm install @en32/debuggy
-
-# Using yarn
-yarn add @en32/debuggy
 
 # Using Bun
 bun add @en32/debuggy
@@ -209,7 +206,7 @@ You can configure `debuggy` to save logs to a file by integrating it with an ext
           if (logger[level]) {
             logger[level](message, location);
           } else {
-            logger.info(message, location);
+            logger.debug(message, location);
           }
         },
       },
@@ -232,7 +229,7 @@ You can configure `debuggy` to save logs to a file by integrating it with an ext
     debuggy('UI Update')('The UI has been successfully refreshed.');
     ```
 
-For more detailed examples, please refer to the files in the **[examples directory](https://www.google.com/search?q=./examples)**.
+For more detailed examples, please refer to the files in the **[examples directory](https://github.com/enix1032/debuggy/tree/v2/examples)**.
 
 -----
 
