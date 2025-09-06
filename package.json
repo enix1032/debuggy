@@ -1,6 +1,6 @@
 {
   "name": "@en32/debuggy",
-  "version": "1.0.1-refactored",
+  "version": "2.0.0",
   "description": "A simple debug logger.",
   "main": "dist/index.js",
   "module": "src/index.ts",
@@ -40,12 +40,16 @@
   ],
   "author": "Enix Ardiansyah",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enix1032/debuggy.git"
+  },
   "devDependencies": {
     "typescript": "^5.5.3",
     "@en32/debuggy": "file:./../debuggy"
   },
   "dependencies": {
-    "@en32/logger": "link:./../logger"
+    "@en32/logger": "^1.0.0"
   },
   "dependenciesMeta": {
     "@en32/logger": {
