@@ -1,6 +1,6 @@
 {
   "name": "@en32/debuggy",
-  "version": "1.0.1-refactored",
+  "version": "2.0.4",
   "description": "A simple debug logger.",
   "main": "dist/index.js",
   "module": "src/index.ts",
@@ -13,23 +13,28 @@
     },
     "./global": {
       "import": "./global.js"
+    },
+    "./utils": {
+      "import": "./src/utils.ts"
     }
   },
   "scripts": {
     "build:node:min": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --minify",
     "build:node:watch": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --watch",
-    "example:simple": "DEBUG=debuggy bun run --hot ./examples/simple.js",
-    "example:custom": "DEBUG=debuggy bun run --hot ./examples/custom.js",
+    "example:custom": "DEBUG=debuggy bun run --hot ./examples-ts/custom.ts",
+    "example:custom:node": "DEBUG=debuggy nodemon ./examples/custom.js",
     "example:logger:debug": "DEBUG=debuggy bun run --hot ./examples/logger.js",
     "example:logger": "bun run --hot ./examples/logger.js",
+    "example:simple": "DEBUG=debuggy bun run --hot ./examples-ts/simple.ts",
     "example:simple:node": "DEBUG=debuggy nodemon ./examples/simple.js",
-    "example:server": "DEBUG=debuggy bun --hot ./examples/server/index.js",
+    "example:server": "DEBUG=debuggy bun --hot ./examples-ts/server/index.ts",
     "example:server:node": "DEBUG=debuggy nodemon ./examples/server/index.js"
   },
   "files": [
     "dist",
     "src",
     "global.js",
+    "global.ts",
     "package.json"
   ],
   "keywords": [

@@ -1,6 +1,8 @@
 import { _tpl, parseStackTraceLine, splitAndCleanString, welcomeMessage } from './utils';
 import { DebuggyOptions, TemplateParams, DebuggyInstance, CreateMethodReturnType, LogData } from './types';
 
+export * as utils from './utils' 
+
 // Environment check
 const isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'debuggy';
 
@@ -10,6 +12,7 @@ const isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'debu
  */
 export class Debuggy {
   private _options: DebuggyOptions;
+  private _ansiReset: string = '\x1b[0m';
 
   /**
    * Creates an instance of Debuggy.
@@ -187,6 +190,17 @@ export class Debuggy {
   }
 
   /**
+   * Shorthand Template
+   * @param tpl 
+   * @param executedTime 
+   */
+  private executeTimeTemplate(executedTime: string, dateFormatter?: Function) {
+    const tpl = (text: string, tokens: any) => _tpl(text, tokens, dateFormatter);
+    console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
+    console.log(tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
+  }
+
+  /**
    * Displays the log output based on the active template and writes to logger if configured.
    * @param {object} params - The parameters for displaying the log.
    * @param {string} params.label - The log label.
@@ -232,9 +246,11 @@ export class Debuggy {
         if (data.at && data.at !== 'N/A') {
           console.log(tpl(`<hg>at<s>    : <hc>{at}`, data));
         }
-        console.log(tpl(`<hg>File<s>  : <hm>{file}`, data));
-        console.log(tpl(`<hg>Line<s>  : <hw>{line}<s>`, data));
-        console.log(tpl(`<hg>-----<s> : <h>⌈{datetime}⌋<s>`, {}));
+        console.log(tpl(`<hg>file<s>  : <hm>{file}`, data));
+        console.log(tpl(`<hg>line<s>  : <hw>{line}<s>`, data));
+        console.log(tpl(`<hg>tspan<s> : <h>{datetime}<s>`, {}));
+        // console.log(tpl(`<hg>tspan<s> : <h>⌈{datetime}⌋<s>`, {})); // backup simbol `⌈⌋`, :lol
+        console.log(tpl(`---------------------------------------`, {}));
       } else {
         activeTemplate.head(templateParams);
       }
@@ -252,23 +268,20 @@ export class Debuggy {
             console.table(arg);
             i++;
             const end = performance.now(), executedTime = (end - start).toFixed(2);
-            console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
-            console.log(tpl(`<hy>executed time: <hw>{executedTime}ms\n`, { executedTime }));
+            this.executeTimeTemplate(executedTime, dateFormatter)
           }
         } else if (typeof sanitizedMode === 'string' && sanitizedMode.includes('%j')) {
           const start = performance.now();
           console.log(JSON.stringify(args[0], null, 2));
           const end = performance.now(), executedTime = (end - start).toFixed(2);
-          console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
-          console.log(tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
+          this.executeTimeTemplate(executedTime, dateFormatter)
         } else {
           // Log each argument with its execution time
           args.forEach(arg => {
             const start = performance.now();
             console.log(arg);
             const end = performance.now(), executedTime = (end - start).toFixed(2);
-            console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
-            console.log(tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
+            this.executeTimeTemplate(executedTime, dateFormatter)
           });
         }
       } else {
@@ -286,7 +299,7 @@ export class Debuggy {
    */
   private logByFormat(format: string, arg: any, groupIndex?: number) {
     
-    const cleanLabel = format.replace(/\%[\w]/ig, '').trim();
+    const cleanLabel = format.replace(/\%[\w]+/ig, '').trim();
     if (groupIndex) {
       console.log(_tpl(`<gh>#<hy> ${cleanLabel}<s>:`, {}));
     }
@@ -302,8 +315,7 @@ export class Debuggy {
 
     const end = performance.now();
     const executedTime = (end - start).toFixed(2);
-    console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
-    console.log(_tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
+    this.executeTimeTemplate(executedTime)
   }
 }
 
@@ -320,7 +332,7 @@ export const debuggy = debuggyWithLevel as DebuggyInstance;
 (debuggy as any).set = (label: string) => debuggyInstance.output.bind(debuggyInstance, label);
 (debuggy as any).create = debuggyInstance.create.bind(debuggyInstance);
 
-// Set up dynamic methods (info, warn, error)
+// Set up dynamic methods (info, warn, error, debug)
 ['info', 'warn', 'error', 'debug'].forEach(level => {
   (debuggy as any)[level] = (label: string = '') => {
     // Gabungkan label dinamis jika ada

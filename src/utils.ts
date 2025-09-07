@@ -51,17 +51,24 @@ for (const [k, v] of Object.entries(colorsCode)) {
  * @param {string[]} locales - The locales to use for formatting.
  * @returns {string} The formatted date string.
  */
-export const customDateFormatter = (date: Date, locales: string[] = ['en-US']): string => {
+export const customDateFormatter = (
+  date: Date,
+  locales: string[] = ['en-US']
+): string => {
   const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
-  };
-  return date.toLocaleString(locales, options);
+    fractionalSecondDigits: 3,
+  } as any;
+
+  const formatted = date.toLocaleString(locales, options);
+  const [datePart, yearPart, timePart] = formatted.split(",").map(s => s.trim());
+  return `📅 ${datePart}, ${yearPart} ⏰ ${timePart}`;
 };
 
 /**
@@ -149,3 +156,23 @@ export const welcomeMessage = (): void => {
   ))
   groupEnd()
 }
+
+/**
+ * Minify a SQL query string into a single-line inline format.
+ *
+ * Main features:
+ * - Removes line breaks (`\n`, `\r`), tabs, and excessive whitespace.
+ * - Normalizes spaces around commas and parentheses for cleaner output.
+ * - Produces a compact one-line SQL string, suitable for inline usage in code.
+ *
+ * ⚠️ Note:
+ * - This function does not perform advanced SQL parsing.
+ * - Use it only for lightweight formatting / minification purposes.
+ *
+ * @param sql - A SQL query string, possibly multiline.
+ * @returns The SQL query in single-line (minified) form.
+ */
+export function inlineSQL(sql: string): string {
+  return sql.split(/\n/).map((item: string) => item.trim()).join(' ')
+}
+

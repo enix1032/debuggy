@@ -13,6 +13,10 @@ export interface DebuggyOptions {
   };
   dateFormatter?: (date: Date) => string;
   stackFileIndex?: number;
+  logger?: {
+    write: boolean;
+    saveMethod?: (data: LogData) => void;
+  };
 }
 
 /**
@@ -24,7 +28,22 @@ export interface TemplateParams {
   label: string;
   mode: string | string[];
   args: any[];
-  data: any;
+  data: LogData;
+  executedTime?: string;
+}
+
+/**
+ * Interface for log data, including location.
+ */
+export interface LogData {
+  level?: string;
+  args?: any[];
+  path?: string;
+  label: string;
+  at: string;
+  file: string;
+  line: number;
+  column: number;
 }
 
 /**
@@ -47,4 +66,31 @@ export interface DebuggyInstance {
     label: string,
     templateName?: string
   ) => CreateMethodReturnType<T, this>;
+  info: (label?: string, ...args: any[]) => void;
+  warn: (label?: string, ...args: any[]) => void;
+  error: (label?: string, ...args: any[]) => void;
+  debug: (label?: string, ...args: any[]) => void;
 }
+
+/**
+ * Interface for the main debuggy function instance.
+ * It combines a callable function with additional properties.
+ */
+declare function debuggy(label?: string, mode?: string | string[], templateName?: string): (...args: any[]) => void;
+
+declare namespace debuggy {
+    function options(options: DebuggyOptions): void;
+    function set(label: string): (...args: any[]) => void;
+    function create<T extends string>(
+        name: T,
+        label: string,
+        mode?: string | string[],
+        templateName?: string
+    ): CreateMethodReturnType<T, typeof debuggy>;
+    function info(label?: string): (...args: any[]) => void;
+    function warn(label?: string): (...args: any[]) => void;
+    function error(label?: string): (...args: any[]) => void;
+    function debug(label?: string): (...args: any[]) => void;
+}
+
+export { debuggy };

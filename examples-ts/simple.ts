@@ -1,5 +1,5 @@
+import { inlineSQL } from '@en32/debuggy/utils'
 import '@en32/debuggy/global';
-import { utils } from '@en32/debuggy'
 
 // Simple logging
 debuggy('Hello')('Hello World');
@@ -85,5 +85,6 @@ FROM top_customers tc
 WHERE tc.rank <= 3
 ORDER BY tc.month DESC, tc.rank ASC;
 `
-const { inlineSQL } = utils
-debuggy('[SQL] Find All')(inlineSQL(sql))
+
+debuggy('[SQL] SQL Query')(inlineSQL(sql))
+
