@@ -1,6 +1,6 @@
 {
   "name": "@en32/debuggy",
-  "version": "1.0.1-refactored",
+  "version": "1.0.4",
   "description": "A simple debug logger.",
   "main": "dist/index.js",
   "module": "src/index.ts",
@@ -20,21 +20,15 @@
   },
   "scripts": {
     "build:node:min": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --minify",
-    "build:node:watch": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --watch",
-    "example:custom": "DEBUG=debuggy bun run --hot ./examples-ts/custom.ts",
-    "example:custom:node": "DEBUG=debuggy nodemon ./examples/custom.js",
-    "example:logger:debug": "DEBUG=debuggy bun run --hot ./examples/logger.js",
-    "example:logger": "bun run --hot ./examples/logger.js",
-    "example:simple": "DEBUG=debuggy bun run --hot ./examples-ts/simple.ts",
-    "example:simple:node": "DEBUG=debuggy nodemon ./examples/simple.js",
-    "example:server": "DEBUG=debuggy bun --hot ./examples-ts/server/index.ts",
-    "example:server:node": "DEBUG=debuggy nodemon ./examples/server/index.js"
+    "build:node:watch": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --watch"
   },
   "files": [
     "dist",
     "src",
     "global.js",
-    "package.json"
+    "global.ts",
+    "package.json",
+    "tsconfig.json"
   ],
   "keywords": [
     "debug",
@@ -44,16 +38,10 @@
   ],
   "author": "Enix Ardiansyah",
   "license": "MIT",
+  "peerDependencies": {
+    "typescript": "^5"
+  },
   "devDependencies": {
-    "typescript": "^5.5.3",
-    "@en32/debuggy": "file:./../debuggy"
-  },
-  "dependencies": {
-    "@en32/logger": "link:./../logger"
-  },
-  "dependenciesMeta": {
-    "@en32/logger": {
-      "optional": true
-    }
+    "@types/bun": "latest"
   }
 }
