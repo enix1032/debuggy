@@ -24,11 +24,11 @@ debuggy.options({
     write: true,
     saveMethod: (params) => {
       const { args, path, line, column, level } = params;
-      const message = args[0];
+      const message: string = args?.[0] || '';
       const location = { path, line, column };
 
-      if (logger[level]) {
-        logger[level](message, location);
+      if (typeof level === 'string' && logger[level as keyof typeof logger]) {
+        (logger[level as keyof typeof logger] as Function)(message, location);
       } else {
         logger.info(message, location);
       }
