@@ -1,7 +1,0 @@
-{
-  "compilerOptions": {
-    "target": "ES2018"
-  },
-  "include": ["dist/types.d.ts", "src/**/*", "src/**/*.js"],
-  "exclude": ["src/**/__tests__/*"]
-}
