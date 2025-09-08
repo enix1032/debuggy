@@ -1,40 +1,48 @@
 {
   "name": "@en32/debuggy",
-  "version": "2.0.4",
+  "version": "2.1.0",
   "description": "A simple debug logger.",
-  "main": "dist/index.js",
-  "module": "src/index.ts",
+  "main": "dist/debuggy.js",
+  "module": "src/debuggy.ts",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/types.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/cjs/index.js"
+      "types": "./dist/types/debuggy.d.ts",
+      "import": "./dist/debuggy.js"
     },
     "./global": {
-      "import": "./global.js"
+      "types": "./global/global.d.ts",
+      "import": "./global/global.js"
     },
     "./utils": {
-      "import": "./src/utils.ts"
+      "types": "./dist/types/utils.d.ts",
+      "import": "./dist/utils.js"
+    },
+    "./buffered": {
+      "types": "./dist/types/buffered.d.ts",
+      "import": "./dist/buffered.js"
     }
   },
   "scripts": {
-    "build:node:min": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --minify",
-    "build:node:watch": "bun build ./src/index.ts --outfile=./dist/index.js --target=node --watch",
-    "example:custom": "DEBUG=debuggy bun run --hot ./examples-ts/custom.ts",
-    "example:custom:node": "DEBUG=debuggy nodemon ./examples/custom.js",
-    "example:logger:debug": "DEBUG=debuggy bun run --hot ./examples/logger.js",
-    "example:logger": "bun run --hot ./examples/logger.js",
-    "example:simple": "DEBUG=debuggy bun run --hot ./examples-ts/simple.ts",
-    "example:simple:node": "DEBUG=debuggy nodemon ./examples/simple.js",
-    "example:server": "DEBUG=debuggy bun --hot ./examples-ts/server/index.ts",
-    "example:server:node": "DEBUG=debuggy nodemon ./examples/server/index.js"
+    "build": "bun build.ts",
+    "build:watch": "bun build.ts --watch",
+    "build:tsc": "tsc",
+    "ex:custom:js": "DEBUG=debuggy nodemon ./examples/js/custom.js",
+    "ex:custom:ts": "DEBUG=debuggy bun run --hot ./examples/ts/custom.ts",
+    "ex:simple:js": "DEBUG=debuggy nodemon ./examples/js/simple.js",
+    "ex:simple:ts": "DEBUG=debuggy bun run --hot ./examples/ts/simple.ts",
+    "ex:server:js": "DEBUG=debuggy nodemon ./examples/js/server/index.js",
+    "ex:server:ts": "DEBUG=debuggy bun --hot ./examples/ts/server/index.ts",
+    "ex:buffer:js": "DEBUG=debuggy nodemon ./examples/js/buffered.js",
+    "ex:buffer:ts": "bun run --hot ./examples/ts/buffered.ts",
+    "ex:logger:js": "DEBUG=debuggy nodemon ./examples/js/logger.js",
+    "ex:logger:ts": "bun run --hot ./examples/ts/logger.ts",
+    "ex:logger:ts:debug": "DEBUG=debuggy bun run --hot ./examples/ts/logger.ts"
   },
   "files": [
     "dist",
     "src",
-    "global.js",
-    "global.ts",
+    "global",
     "package.json"
   ],
   "keywords": [
@@ -45,6 +53,10 @@
   ],
   "author": "Enix Ardiansyah",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/enix1032/debuggy.git"
+  },
   "devDependencies": {
     "typescript": "^5.5.3",
     "@en32/debuggy": "file:./../debuggy"

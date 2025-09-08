@@ -4,9 +4,9 @@
  * to the log file.
  */
 
-import { debuggy } from '@en32/debuggy';
-//import Logger, { LogLevel } from '@en32/logger';
-import Logger, { LogLevel } from './../../logger/index.js';
+import debuggy from '@en32/debuggy';
+import { Logger, LogLevel } from '@en32/logger';
+//import { Logger, LogLevel } from './../../logger/dist/index.js';
 
 // Adjust based on your environment: DEVELOPMENT, PRODUCTION, TESTING, or ALL (always active).
 const isAllowed = true;
@@ -14,7 +14,7 @@ const isAllowed = true;
 /** * 1. Create a Logger instance from @en32/logger. 
  * @type {Logger}
  */
-const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, isAllowed, 5000);
+const logger = new Logger('./examples/ts/logs/example.log', LogLevel.DEBUG, isAllowed, 5000);
 
 /**
  * 2. Configure debuggy to use the logger.
@@ -22,13 +22,12 @@ const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, isAllow
 debuggy.options({
   logger: {
     write: true,
-    saveMethod: (params) => {
-      const { args, path, line, column, level } = params;
+    saveMethod: ({ args, path, line, column, level }) => {
       const message: string = args?.[0] || '';
       const location = { path, line, column };
 
       if (typeof level === 'string' && logger[level as keyof typeof logger]) {
-        (logger[level as keyof typeof logger] as Function)(message, location);
+        logger.create(level as LogLevel, message, location);
       } else {
         logger.info(message, location);
       }

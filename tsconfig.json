@@ -1,7 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2018"
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "Bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "allowJs": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitThis": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationDir": "./dist/types",
+    "stripInternal": true
   },
-  "include": ["dist/types.d.ts", "src/**/*", "src/**/*.js"],
-  "exclude": ["src/**/__tests__/*"]
+  "include": [
+    "src/*"
+  ]
 }

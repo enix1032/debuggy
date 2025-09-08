@@ -13,7 +13,8 @@ A simple, customizable, and lightweight debug logger for Node.js and Bun. It pro
   * **Customizable Templates:** Create your own log display templates to match your project's style.
   * **Tag-Based Filtering:** Use tags (e.g., `[API]`, `[DB]`) to show only relevant logs via the `DEBUG` environment variable.
   * **Rich Formatting:** Supports various console formatting options including tables (`%t`), JSON (`%j`), and custom ANSI color codes.
-  * **Extensible:** Easily create new custom methods for the debuggy instance (e.g., `debuggy.warn`, `debuggy.error`).
+  * **Extensible:** Easily create new custom methods, labels, and presets for reusable logging.
+  * **Buffered Logging:** Collect and flush logs periodically or stream them asynchronously.
 
 -----
 
@@ -35,126 +36,92 @@ bun add @en32/debuggy
 
 ### Simple Logging
 
-Import the `debuggy` function and use it to log messages.
-
 ```typescript
-// simple.ts
-import { debuggy } from '@en32/debuggy';
+import '@en32/debuggy/global';
 
 // Simple message
 debuggy('Hello')('Hello World');
 
 // Log a variable, label is automatically inferred from variable name
-const data = {
-  name: 'John',
-  age: 30,
-};
+const data = { name: 'John', age: 30 };
 debuggy()(data);
 
 // Log multiple arguments
-const otherData = {
-  name: 'Jane',
-  age: 25,
-};
+const otherData = { name: 'Jane', age: 25 };
 debuggy('Debug Multiple')(data, otherData);
+
+// Table format (%t)
+debuggy('Debug %t')(data);
+debuggy('Debug %t')(data, otherData);
+
+// JSON format (%j)
+debuggy('Debug %j')(data);
+
+// Grouped logs with mixed formats
+debuggy('Debug Group', ['Group 1 %t', 'Group 2 %j'])(data, otherData);
+
+// Combined formatting
+debuggy('Debug %t %j')(data, otherData);
+
+// Custom colors
+debuggy('<hy>Colored Log')(data);
+debuggy('<hBy>Colored Log with Background')(data);
 ```
 
-To run the example, use the `DEBUG` environment variable:
+Run with:
 
 ```bash
-DEBUG=debuggy bun run ./examples/simple.ts
+# BunJS
+DEBUG=debuggy bun run --hot ./examples-ts/simple.ts
 ```
 
-### Advanced Formatting
-
-Use special characters to format your output, such as `%t` for tables and `%j` for JSON.
-
-```typescript
-import { debuggy } from '@en32/debuggy';
-
-const data = {
-  name: 'John',
-  age: 30,
-};
-
-// Display as a table
-debuggy('Data Table %t')(data);
-
-// Display as JSON
-debuggy('Data JSON %j')(data);
+```bash
+# NodeJS + Nodemon
+DEBUG=debuggy nodemon ./examples/simple.js
 ```
 
-You can also apply ANSI color codes using simple tags.
+### Shortcuts with `label()` and `preset()`
 
 ```typescript
-import { debuggy } from '@en32/debuggy';
+// Using label()
+const warn = debuggy.label('<hYb>WARNING<s>');
+warn({ id: 1, msg: 'Something happened' });
 
-// Colored log message: <hy> (highlight yellow), <s> (reset)
-debuggy('<hy>Colored Log')(data);
+const err = debuggy.label('<rh>ERROR<s>');
+err({ id: 2, msg: 'Critical failure' });
 
-// Colored log with background: <hBy> (highlight background yellow)
-debuggy('<hBy>Colored Log with Background')(data);
+// Using preset()
+const debug = debuggy
+  .preset('log', '<bYh>Log Data<s>')
+  .preset('info', '<yGh>Info Data<s>', 'myCustom');
+
+debug.log({ id: 1, message: 'Hello' });
+debug.info({ id: 2, message: 'World' });
 ```
 
 ### Custom Methods
 
-The `create` method allows you to define new log methods with predefined labels and templates.
-
 ```typescript
-import { debuggy } from '@en32/debuggy';
-
 // Create 'warn' and 'error' methods with specific labels and colors
 const debug = debuggy
   .create('warn', '<rYh>{label}<s>')
   .create('error', '<yRh>{label}<s>');
 
-const sampleData = {
-  id: 1,
-  message: 'This is a sample message.',
-};
+const sampleData = { id: 1, message: 'This is a sample message.' };
 
 // Use the new custom methods
 debug.warn('Warning Label')(sampleData);
 debug.error('Error Label')(sampleData);
-```
 
-You can also chain the `create` method and use it immediately for a one-off log.
-
-```typescript
-// Chaining `create` and calling the new method directly
+// One-off chained usage
 debuggy
   .create('info', '<ch>{label}<s>')
   .info('Info Label')('This is an info message.');
 ```
 
-### Log Shortcuts with `set()`
-
-The `set()` method provides a quick way to create a reusable log function with a fixed label and formatting.
-
-```typescript
-import { debuggy } from '@en32/debuggy';
-
-const data = {
-  name: 'John',
-  age: 30,
-};
-
-// Create a shortcut for a colored 'WARNING' label
-const warn = debuggy.set('<hYb>WARNING<s>');
-warn('%t', data);
-
-// Create a shortcut for a colored 'ERROR' label
-const err = debuggy.set('<rh>ERROR<s>');
-err(data);
-```
-
 ### Custom Templates
 
-You can customize the entire log output by defining your own templates. This gives you full control over the header and body of each log entry.
-
 ```typescript
-import { debuggy } from '@en32/debuggy';
-
 debuggy.options({
   templateActive: 'myCustom',
   templates: {
@@ -168,155 +135,537 @@ debuggy.options({
         console.log();
       },
     },
+    full: {
+      all: ({ data, args }) => {
+        console.log('--- Custom Full Template ---');
+        console.log('Tokens:', data);
+        console.log('Arguments:', args);
+        console.log('---------------------------');
+      },
+    },
   },
 });
 
 debuggy('Custom Log Example')('Hello from custom template!');
+debuggy('Full Custom Template', 'full')('This log uses the "full" template.');
 ```
 
-### Logging to File
+### Buffered Logging (Experimental)
 
-You can configure `debuggy` to save logs to a file by integrating it with an external logger. This is useful for persistent logging and debugging. The `@en32/logger` package is a good option for this.
+```typescript
+import { buffered } from '@en32/debuggy/buffered';
 
-1.  **Installation**:
-    First, ensure you have `@en32/logger` installed.
+// Interval mode: collect logs and flush every 2 seconds
+const warn = buffered('<hYb>WARNING<s>', 'myCustom', { mode: 'interval', interval: 2000 });
+for (let i = 0; i < 5; i++) {
+  warn({ id: i, msg: `batched warning ${i}` });
+}
 
-    ```bash
-    npm install @en32/logger
-    ```
+// Async mode: stream logs
+const { log: errorLog, stream } = buffered('<rh>ERROR<s>', 'myCustom', { mode: 'async' });
+for (let i = 0; i < 3; i++) {
+  errorLog({ id: i, msg: `async error ${i}` });
+}
 
-2.  **Configuration**:
-    Create an instance of `Logger` and configure `debuggy`'s `logger` option. You can define a custom `saveMethod` to handle how logs are written to the file. The `write: true` option is crucial, as it enables the file logging functionality.
+(async () => {
+  for await (const entry of stream) {
+    console.log('>>> Stream received:', entry);
+    break;
+  }
+})();
+```
 
-    ```typescript
-    import { debuggy } from '@en32/debuggy';
-    import Logger, { LogLevel } from '@en32/logger';
+### Inline SQL Example (Utility)
 
-    const isAllowed = true;
-    const logger = new Logger('./my-app.log', LogLevel.DEBUG, isAllowed, 5000);
+```typescript
+import { inlineString } from '@en32/debuggy/utils';
 
-    debuggy.options({
-      logger: {
-        write: true,
-        saveMethod: (params) => {
-          const { args, path, line, column, level } = params;
-          const message = args[0];
-          const location = { path, line, column };
+const sql = `WITH monthly_sales AS ( ... ) SELECT ... <truncated>`;
+debuggy('[SQL] SQL Query')(inlineString(sql, { maxLength: 100 }));
+```
 
-          if (logger[level]) {
-            logger[level](message, location);
-          } else {
-            logger.debug(message, location);
-          }
-        },
-      },
-    });
-    ```
+### Logging to File (Experimental)
 
-3.  **Selective Logging**:
-    To selectively log messages to the file, use a specific token. The convention is to use `%log`. When you include `%log` in the label or mode, the log entry will be saved to the file, and the token will be automatically removed from the console output.
+```typescript
+import { debuggy } from '@en32/debuggy';
+import { Logger, LogLevel } from '@en32/logger';
 
-    ```typescript
-    // Create a new method that includes the `%log` token in its label.
-    const log = debuggy
-      .create('warn', '<y>WARN:<s> {label} %log')
-      .create('error', '<r>ERROR:<s> {label} %log');
+const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, true, 5000);
 
-    // This log will be displayed in the console AND saved to the log file
-    log.warn('Login Failed')('The user entered an invalid password.');
+debuggy.options({
+  logger: {
+    write: true,
+    saveMethod: ({ args, path, line, column, level }) => {
+      const message: string = args?.[0] || '';
+      const location = { path, line, column };
 
-    // This log will be displayed in the console but NOT saved to the file
-    debuggy('UI Update')('The UI has been successfully refreshed.');
-    ```
+      if (typeof level === 'string' && logger[level as keyof typeof logger]) {
+        logger.create(level as LogLevel, message, location);
+      } else {
+        logger.debug(message, location);
+      }
+    },
+  },
+});
 
-For more detailed examples, please refer to the files in the **[examples directory](https://github.com/enix1032/debuggy/tree/v2/examples)**.
+// Selective logging with %log token
+const log = debuggy
+  .create('warn', '<y>WARN:<s> {label} %log')
+  .create('error', '<r>ERROR:<s> {label} %log');
+
+log.warn('Login Failed')('The user entered an invalid password.');
+debuggy('UI Update')('This one will not be saved.');
+```
+
+For more examples, please refer to the [`./examples`](https://github.com/enix1032/debuggy/tree/v2/examples) directories.
 
 -----
 
 ## API
 
-### `debuggy(label, mode?, templateName?)`
+### `debuggy(label?, mode?, templateName?)`
 
-The main debug function. Returns a function to log the actual arguments.
+Main debug function. Returns a function to log the actual arguments.
 
   * `label` (string, optional): A label for the log entry.
-  * `mode` (string | string[], optional): Special formatting string(s) like `'%t'` or `'%j'`.
-  * `templateName` (string, optional): The name of a custom template to use.
+  * `mode` (string | string[], optional): Formatting string(s) like `'%t'`, `'%j'`, `'%log'`.
+  * `templateName` (string, optional): The name of a custom template.
 
 ### `debuggy.options(options)`
 
-Updates the global configuration for `debuggy`.
+Update the global configuration.
 
-  * `options` (object):
-      * `shows` (string | string[]): A comma-separated list of tags to enable.
-      * `templateActive` (string): The default template to use.
-      * `templates` (object): An object containing your custom template definitions.
-      * `dateFormatter` (function): A custom function to format the date in templates.
-      * `stackFileIndex` (number): The stack trace index to use for file location.
-      * `logger` (object): Configures file logging.
-          * `write` (boolean): Set to `true` to enable file logging. Defaults to `false`.
-          * `saveMethod` (function): A custom function that handles writing the log to a file. It receives a `params` object containing `args`, `path`, `line`, `column`, and `level` of the log entry. This allows you to integrate with any external logging library.
+  * `shows`: Tags to enable.
+  * `templateActive`: Default template.
+  * `templates`: Custom template definitions.
+  * `dateFormatter`: Custom date formatter.
+  * `stackFileIndex`: Index for stack trace.
+  * `logger`: File logging config.
 
 ### `debuggy.create(name, label, templateName?)`
 
-Creates a new custom method on the `debuggy` instance for reusable logging functions.
+Add a reusable custom method.
 
-  * `name` (string): The name of the new method (e.g., `'warn'`, `'error'`).
-  * `label` (string): The predefined label for the new method.
-  * `templateName` (string, optional): The template to use for this method.
+### `debuggy.label(label)`
 
-### `debuggy.set(label)`
+Create a shortcut function with a fixed label.
 
-A shortcut for creating a new log function with a predefined label.
+### `debuggy.preset(name, label, templateName?)`
+
+Create a reusable one-step method (`method(data)`).
 
 -----
 
 ## Global Usage
 
-You can also use a global instance of `debuggy` by importing the global entry point.
-
 ```typescript
-// Add this at the top of your main file
 import '@en32/debuggy/global';
 
-// Now `debuggy` is available globally without needing to import
 debuggy('Global Log')('This is a global log message.');
+```
+
+### Note:
+
+If you encounter issues with global types, use one of the following approaches:
+
+#### 1. Add a triple-slash directive
+
+Place this **once** at the very top of your main TypeScript entry file, such as `index.ts`, `main.ts`, etc.:
+
+```ts
+/// <reference types="@en32/debuggy/global" />
+
+debuggy('Hello Global!')('This works without import');
+```
+
+---
+
+#### 2. Configure `tsconfig.json`
+
+Add the following to your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "types": ["@en32/debuggy/global"]
+  }
+}
 ```
 
 -----
 
 ## ANSI Color Cheatsheet
 
-You can use single-character tags within `<...>` to apply ANSI color codes.
-
 | Tag | Name | Type | Description |
 |:---:|:---|:---|:---|
-| `s` | `reset` | **Style** | Resets all attributes |
-| `h` | `bright` | **Style** | Sets text to bright/bold |
-| `u` | `underline` | **Style** | Underlines the text |
-| `k` | `blink` | **Style** | Makes the text blink |
-| `n` | `hidden` | **Style** | Hides the text |
-| `b` | `black` | **Foreground** | Black text |
-| `r` | `red` | **Foreground** | Red text |
-| `g` | `green` | **Foreground** | Green text |
-| `y` | `yellow` | **Foreground** | Yellow text |
-| `e` | `blue` | **Foreground** | Blue text |
-| `m` | `magenta` | **Foreground** | Magenta text |
-| `c` | `cyan` | **Foreground** | Cyan text |
-| `w` | `white` | **Foreground** | White text |
-| `B` | `black` | **Background** | Black background |
-| `R` | `red` | **Background** | Red background |
-| `G` | `green` | **Background** | Green background |
-| `Y` | `yellow` | **Background** | Yellow background |
-| `E` | `blue` | **Background** | Blue background |
-| `M` | `magenta` | **Background** | Magenta background |
-| `C` | `cyan` | **Background** | Cyan background |
-| `W` | `white` | **Background** | White background |
+| `s` | reset | Style | Reset all attributes |
+| `h` | bright | Style | Bright/bold text |
+| `u` | underline | Style | Underlined text |
+| `k` | blink | Style | Blinking text |
+| `n` | hidden | Style | Hidden text |
+| `b` | black | Foreground | Black text |
+| `r` | red | Foreground | Red text |
+| `g` | green | Foreground | Green text |
+| `y` | yellow | Foreground | Yellow text |
+| `e` | blue | Foreground | Blue text |
+| `m` | magenta | Foreground | Magenta text |
+| `c` | cyan | Foreground | Cyan text |
+| `w` | white | Foreground | White text |
+| `B` | black | Background | Black background |
+| `R` | red | Background | Red background |
+| `G` | green | Background | Green background |
+| `Y` | yellow | Background | Yellow background |
+| `E` | blue | Background | Blue background |
+| `M` | magenta | Background | Magenta background |
+| `C` | cyan | Background | Cyan background |
+| `W` | white | Background | White background |
 
-Tags can be combined within a single `<...>` block, e.g., `<hBy>` for a bright yellow foreground with a black background. The `<...>` block does not include a reset, so you should use the `<s>` tag to reset the style after the colored text.
+Combine tags inside `<...>`, e.g., `<hBy>` = bright + yellow foreground + black background. Always end with `<s>` to reset.
 
 -----
 
 ## License
 
 This project is licensed under the **MIT License**.
+
+-----
+
+## Examples
+
+### ./examples/ts/buffered.ts
+
+```typescript
+import { buffered } from "@en32/debuggy/buffered";
+
+// --- Interval mode example ---
+const warn = buffered("<hYb>WARNING<s>", "myCustom", { mode: "interval", interval: 2000 });
+
+// Push multiple logs quickly → they will be flushed together every 2 seconds
+for (let i = 0; i < 5; i++) {
+  warn({ id: i, msg: `batched warning ${i}` });
+}
+
+// --- Async mode example ---
+const { log: errorLog, stream } = buffered("<rh>ERROR<s>", "myCustom", { mode: "async" });
+
+// Produce logs
+for (let i = 0; i < 3; i++) {
+  errorLog({ id: i, msg: `async error ${i}` });
+}
+
+// Consume logs as an async stream
+(async () => {
+  console.log("--- Start consuming async stream ---");
+  let count = 0;
+  for await (const entry of stream) {
+    console.log(">>> Stream received:", entry);
+    count++;
+    if (count >= 3) {
+      console.log("--- Stopping async consumer ---");
+      break; // stop after 3 entries
+    }
+  }
+})();
+
+// Auto-stop after first interval flush
+setTimeout(() => {
+  console.log("\n=== Interval flush should have happened above ===");
+  console.log("--- Exiting now ---\n");
+  process.exit(0);
+}, 2500);
+
+/** Bug in BunJS runtime. */
+
+```
+---
+
+### ./examples/ts/custom.ts
+
+```typescript
+import debuggy from '@en32/debuggy';
+
+// Configure debuggy with custom options
+debuggy.options({
+  // shows: 'API,DB',
+  templateActive: 'myCustom',
+  templates: {
+    myCustom: {
+      head: ({ template, tokens }) => {
+        console.log(template(`<hy>###### <s>{label}`, tokens));
+        console.log(template(`<hg>#<s> {file}:{line}:{column}`, tokens));
+      },
+      body: ({ args }) => {
+        console.log(...args);
+        console.log();
+      },
+    },
+    full: {
+      all: ({ data, args }) => {
+        console.log('--- Custom Full Template ---');
+        console.log('Tokens:', data);
+        console.log('Arguments:', args);
+        console.log('---------------------------');
+      },
+    },
+  },
+});
+
+// A log with a tag that is enabled by `shows`
+debuggy('[API] User fetched')(1, 2, 3);
+
+// A log with a tag that is not enabled by `shows`, so it won't be displayed
+debuggy('[UI] Button clicked')('This log should not appear');
+
+// Using the default custom template (`myCustom`)
+debuggy('Custom Log Example')('Hello from custom template!');
+
+// Using a specific template
+debuggy('Full Custom Template', 'full')('This log uses the "full" template.');
+
+// Create new custom methods for the debuggy instance
+const debug = debuggy.create('warn', '<rYh>{label}<s>').create('error', '<yRh>{label}<s>', 'myCustom');
+
+const sampleData = {
+  id: 1,
+  message: 'This is a sample message.',
+};
+
+// Use the newly created custom methods
+console.log('--- Using custom methods ---');
+debug.warn('Warning Label')(sampleData);
+debug.error('Error Label')(sampleData);
+
+// You can also chain the `create` method and use it immediately
+debuggy
+  .create('info', '<ch>{label}<s>')
+  .info('Info Label')('This is an info message.');
+
+
+```
+---
+
+### ./examples/ts/logger.ts
+
+```typescript
+/**
+ * @file This example demonstrates how to use the `%log` token to selectively save logs to a file.
+ * @description Only log calls that contain the `%log` token in their label or mode will be saved
+ * to the log file.
+ */
+
+import debuggy from '@en32/debuggy';
+import { Logger, LogLevel } from '@en32/logger';
+//import { Logger, LogLevel } from './../../logger/dist/index.js';
+
+// Adjust based on your environment: DEVELOPMENT, PRODUCTION, TESTING, or ALL (always active).
+const isAllowed = true;
+
+/** * 1. Create a Logger instance from @en32/logger. 
+ * @type {Logger}
+ */
+const logger = new Logger('./examples/ts/logs/example.log', LogLevel.DEBUG, isAllowed, 5000);
+
+/**
+ * 2. Configure debuggy to use the logger.
+ */
+debuggy.options({
+  logger: {
+    write: true,
+    saveMethod: ({ args, path, line, column, level }) => {
+      const message: string = args?.[0] || '';
+      const location = { path, line, column };
+
+      if (typeof level === 'string' && logger[level as keyof typeof logger]) {
+        logger.create(level as LogLevel, message, location);
+      } else {
+        logger.info(message, location);
+      }
+
+      // You can also use other logging libraries here, including those that store log data in a database like SQLite.
+    },
+  },
+});
+
+/**
+ * A custom method to create a 'warn' log that will automatically save to a file.
+ * The `%log` token is included in the predefined label.
+ */
+const log = debuggy
+  .create('warn', '<y>WARN:<s> {label} %log')
+  .create('error', '<r>ERROR:<s> {label} %log')
+  .create('info', '<b>INFO:<s> {label} %log')
+  .create('debug', '<w>DEBUG:<s> {label} %log');
+
+// --- Log calls with and without the `%log` token ---
+
+// This log will be displayed in the console AND saved to the log file.
+// The `%log` token in the label will be removed in the console output.
+log.warn('Login Failed')('The user entered an invalid password.');
+
+// This log will be displayed in the console AND saved to the log file.
+// The `%log` token is passed as the mode.
+log.error('Database Error')((new Error('Failed to connect to the database.')).toString());
+
+// This log will be displayed in the console but will NOT be saved to the file,
+// because it does not contain the `%log` token.
+debuggy('UI Update')('The UI has been successfully refreshed.');
+log.debug('UI Update')('The UI has been successfully refreshed.');
+
+// A regular log without any token. It will not be saved to the file.
+debuggy('General Info')('Application started successfully.');
+log.info('General Info')('Application started successfully.');
+
+```
+---
+
+### ./examples/ts/server/debuggy.ts
+
+```typescript
+import debuggy from '@en32/debuggy';
+
+// Configure debuggy with custom options
+debuggy.options({
+  // shows: 'API,DB',
+});
+
+globalThis.debuggy = debuggy
+
+```
+---
+
+### ./examples/ts/server/helpers/hello.ts
+
+```typescript
+export default (message: string) => {
+  debuggy('Hello')(message);
+}
+
+```
+---
+
+### ./examples/ts/server/index.ts
+
+```typescript
+import './debuggy'
+import hello from './helpers/hello'
+
+hello('Hello World!!!');
+
+```
+---
+
+### ./examples/ts/simple.ts
+
+```typescript
+import '@en32/debuggy/global';
+import { inlineString } from '@en32/debuggy/utils'
+
+// Simple logging
+debuggy('Hello')('Hello World');
+
+// Automatic label from variable name
+const data = {
+  name: 'John',
+  age: 30,
+};
+debuggy()(data);
+
+// Displaying multiple arguments
+const otherData = {
+  name: 'Jane',
+  age: 25,
+};
+debuggy('Debug Multiple')(data, otherData);
+
+// Displaying objects as a table (%t)
+debuggy('Debug %t')(data);
+debuggy('Debug %t')(data, otherData);
+
+// Displaying objects as JSON (%j)
+debuggy('Debug %j')(data);
+
+// Grouping logs with different formats
+debuggy('Debug Group', ['Group 1 %t', 'Group 2 %j'])(data, otherData);
+
+// Combinations of formatting
+debuggy('Debug %t %j')(data, otherData);
+
+// Using custom colors
+debuggy('<hy>Colored Log')(data);
+debuggy('<hBy>Colored Log with Background')(data);
+
+// Creating a shortcut
+
+// This works, but the output line remains the same. Not recommended. Can be used if necessary.
+const debug = debuggy('Debug: <yh>always line 42<s>');
+debug('debug here...');
+debug('here...');
+debug('and here...');
+
+// Solution #1 (Slight issue in BunJS runtime display)
+const warn = debuggy.label('<hYb>WARNING<s>');
+warn(data);
+
+const err = debuggy.label('<rh>ERROR<s>');
+err(data);
+
+// Solution #2
+const debug2 = debuggy
+  .preset('log', '<bYh>Log Data<s>')
+  .preset('info', '<yGh>Info Data<s>', 'myCustom');
+
+debug2.log({ id: 1, message: 'Hello' });
+debug2.info({ id: 2, message: 'World' });
+
+// Example of a long SQL query string. `inlineString()` is a simple helper, do not expect too much.
+
+const sql = `WITH monthly_sales AS (
+    SELECT 
+        strftime('%Y-%m', o.order_date) AS month,
+        u.id AS user_id,
+        u.name AS customer_name,
+        SUM(oi.quantity * p.price) AS total_spent,
+        COUNT(DISTINCT o.id) AS total_orders
+    FROM orders o
+    JOIN users u ON u.id = o.user_id
+    JOIN order_items oi ON oi.order_id = o.id
+    JOIN products p ON p.id = oi.product_id
+    WHERE o.status = 'completed'
+    GROUP BY month, u.id
+),
+top_customers AS (
+    SELECT 
+        month,
+        user_id,
+        customer_name,
+        total_spent,
+        RANK() OVER (PARTITION BY month ORDER BY total_spent DESC) AS rank
+    FROM monthly_sales
+)
+SELECT 
+    tc.month,
+    tc.customer_name,
+    tc.total_spent,
+    tc.rank,
+    (
+        SELECT GROUP_CONCAT(c.name, ', ')
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        JOIN categories c ON c.id = p.category_id
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.user_id = tc.user_id 
+          AND strftime('%Y-%m', o.order_date) = tc.month
+    ) AS purchased_categories
+FROM top_customers tc
+WHERE tc.rank <= 3
+ORDER BY tc.month DESC, tc.rank ASC;
+`
+
+debuggy('[SQL] SQL Query')(inlineString(sql, { maxLength: 100 }))
+
+// Output:
+// ``WITH monthly_sales AS ( SELECT strftime('%Y-%m', o.order_date) AS month, u.id AS user... <truncated>``
+
+```
+---
+

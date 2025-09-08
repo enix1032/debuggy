@@ -64,11 +64,11 @@ export const customDateFormatter = (
     second: "2-digit",
     hour12: false,
     fractionalSecondDigits: 3,
-  } as any;
+  };
 
   const formatted = date.toLocaleString(locales, options);
   const [datePart, yearPart, timePart] = formatted.split(",").map(s => s.trim());
-  return `📅 ${datePart}, ${yearPart} ⏰ ${timePart}`;
+  return `📅 ${datePart}, ${yearPart} ⏰ ${timePart ?? ''}`;
 };
 
 /**
@@ -93,7 +93,7 @@ export const _tpl = (text: string, tokens?: any, dateFormatter?: Function): stri
   const tagRegex = /\<([a-zA-Z\:]+)\>/g;
   return text.replace(tagRegex, (_match, p1) => {
     // Split the captured string into individual characters and map to color codes
-    const codes = p1.split('').map((char: string) => {
+    const codes = p1.split('').map((char: keyof typeof colorsCode) => {
       const code = colorsCode[char];
       // Special handling for background colors to use the correct ANSI code
       if (char.toUpperCase() === char && "BRGYEMCW".includes(char)) {
@@ -158,21 +158,26 @@ export const welcomeMessage = (): void => {
 }
 
 /**
- * Minify a SQL query string into a single-line inline format.
+ * Inlines a multiline string by joining lines and trimming excess whitespace. Optionally truncates the string.
  *
- * Main features:
- * - Removes line breaks (`\n`, `\r`), tabs, and excessive whitespace.
- * - Normalizes spaces around commas and parentheses for cleaner output.
- * - Produces a compact one-line SQL string, suitable for inline usage in code.
- *
- * ⚠️ Note:
- * - This function does not perform advanced SQL parsing.
- * - Use it only for lightweight formatting / minification purposes.
- *
- * @param sql - A SQL query string, possibly multiline.
- * @returns The SQL query in single-line (minified) form.
+ * @param str The input string to be processed.
+ * @param options Options for truncation.
+ * - maxLength: The maximum number of characters before truncation occurs.
+ * - suffix: The suffix to be appended after the string is truncated. The default is '... <truncated>'.
+ * @returns The inlined and possibly truncated string.
  */
-export function inlineSQL(sql: string): string {
-  return sql.split(/\n/).map((item: string) => item.trim()).join(' ')
-}
+export const inlineString = (str: string, options?: { maxLength?: number; suffix?: string }): string => {
+  const inlinedStr = str.split('\n').map((item: string) => item.trim()).join(' ');
 
+  const maxLength = options?.maxLength;
+  const suffix = options?.suffix ?? '... <truncated>';
+
+  if (maxLength !== undefined && inlinedStr.length > maxLength) {
+    const trimmedLength = maxLength - suffix.length;
+    if (trimmedLength > 0) {
+      return inlinedStr.substring(0, trimmedLength) + suffix;
+    }
+  }
+
+  return inlinedStr;
+};

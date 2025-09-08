@@ -1,5 +1,5 @@
 import '@en32/debuggy/global';
-import { utils } from '@en32/debuggy'
+import { inlineString } from '@en32/debuggy/utils'
 
 // Simple logging
 debuggy('Hello')('Hello World');
@@ -36,13 +36,29 @@ debuggy('<hy>Colored Log')(data);
 debuggy('<hBy>Colored Log with Background')(data);
 
 // Creating a shortcut
-const warn = debuggy.set('<hYb>WARNING<s>');
-warn('%t', data);
 
-const err = debuggy.set('<rh>ERROR<s>');
+// This works, but the output line remains the same. Not recommended. Can be used if necessary.
+const debug = debuggy('Debug: <yh>always line 42<s>');
+debug('debug here...');
+debug('here...');
+debug('and here...');
+
+// Solution #1 (Slight issue in BunJS runtime display)
+const warn = debuggy.label('<hYb>WARNING<s>');
+warn(data);
+
+const err = debuggy.label('<rh>ERROR<s>');
 err(data);
 
-// SQL
+// Solution #2
+const debug2 = debuggy
+  .preset('log', '<bYh>Log Data<s>')
+  .preset('info', '<yGh>Info Data<s>', 'myCustom');
+
+debug2.log({ id: 1, message: 'Hello' });
+debug2.info({ id: 2, message: 'World' });
+
+// Example of a long SQL query string. `inlineString()` is a simple helper, do not expect too much.
 
 const sql = `WITH monthly_sales AS (
     SELECT 
@@ -85,5 +101,5 @@ FROM top_customers tc
 WHERE tc.rank <= 3
 ORDER BY tc.month DESC, tc.rank ASC;
 `
-const { inlineSQL } = utils
-debuggy('[SQL] Find All')(inlineSQL(sql))
+
+debuggy('[SQL] SQL Query')(inlineString(sql, { maxLength: 100 }))

@@ -1,7 +1,6 @@
 import { _tpl, parseStackTraceLine, splitAndCleanString, welcomeMessage } from './utils';
 import { DebuggyOptions, TemplateParams, DebuggyInstance, CreateMethodReturnType, LogData } from './types';
-
-export * as utils from './utils' 
+export * as utils from './utils'
 
 // Environment check
 const isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'debuggy';
@@ -11,8 +10,10 @@ const isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === 'debu
  * @class
  */
 export class Debuggy {
+  /**
+   * @internal
+   */
   private _options: DebuggyOptions;
-  private _ansiReset: string = '\x1b[0m';
 
   /**
    * Creates an instance of Debuggy.
@@ -44,7 +45,12 @@ export class Debuggy {
     Object.assign(this._options, options);
   }
 
-  private catchError (logger: boolean = false) {
+  /**
+   * @internal
+   * @param {boolean} logger 
+   * @returns 
+   */
+  private catchError (logger: boolean = false): Omit<LogData, 'label'> {
     let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
 
     try{
@@ -191,17 +197,18 @@ export class Debuggy {
 
   /**
    * Shorthand Template
+   * @internal
    * @param tpl 
    * @param executedTime 
    */
-  private executeTimeTemplate(executedTime: string, dateFormatter?: Function) {
-    const tpl = (text: string, tokens: any) => _tpl(text, tokens, dateFormatter);
-    console.log(_tpl(`<hy>---------------------<s>`, { executedTime }));
+  private executeTimeTemplate(tpl: Function, executedTime: string) {
+    console.log(tpl(`<hy>---------------------<s>`, { executedTime }));
     console.log(tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
   }
 
   /**
    * Displays the log output based on the active template and writes to logger if configured.
+   * @internal
    * @param {object} params - The parameters for displaying the log.
    * @param {string} params.label - The log label.
    * @param {any[]} params.args - The arguments to be logged.
@@ -268,20 +275,20 @@ export class Debuggy {
             console.table(arg);
             i++;
             const end = performance.now(), executedTime = (end - start).toFixed(2);
-            this.executeTimeTemplate(executedTime, dateFormatter)
+            this.executeTimeTemplate(tpl, executedTime)
           }
         } else if (typeof sanitizedMode === 'string' && sanitizedMode.includes('%j')) {
           const start = performance.now();
           console.log(JSON.stringify(args[0], null, 2));
           const end = performance.now(), executedTime = (end - start).toFixed(2);
-          this.executeTimeTemplate(executedTime, dateFormatter)
+          this.executeTimeTemplate(tpl, executedTime)
         } else {
           // Log each argument with its execution time
           args.forEach(arg => {
             const start = performance.now();
             console.log(arg);
             const end = performance.now(), executedTime = (end - start).toFixed(2);
-            this.executeTimeTemplate(executedTime, dateFormatter)
+            this.executeTimeTemplate(tpl, executedTime)
           });
         }
       } else {
@@ -293,13 +300,14 @@ export class Debuggy {
 
   /**
    * Logs content with specific formatting.
+   * @internal
    * @param {string} format - The formatting string (e.g., '%j', '%t').
    * @param {any} arg - The argument to log.
    * @param {number} [groupIndex] - The index of the log group.
    */
   private logByFormat(format: string, arg: any, groupIndex?: number) {
     
-    const cleanLabel = format.replace(/\%[\w]+/ig, '').trim();
+    const cleanLabel = format.replace(/\%[\w]/ig, '').trim();
     if (groupIndex) {
       console.log(_tpl(`<gh>#<hy> ${cleanLabel}<s>:`, {}));
     }
@@ -315,30 +323,80 @@ export class Debuggy {
 
     const end = performance.now();
     const executedTime = (end - start).toFixed(2);
-    this.executeTimeTemplate(executedTime)
+    this.executeTimeTemplate(_tpl, executedTime)
   }
+
+  // -------
+
+  /**
+   * Creates a new custom preset method for the debuggy instance.
+   * Unlike `create`, which returns a two-step logger (`method(label)(data)`),
+   * `preset` provides a one-step shortcut (`method(data)`).
+   *
+   * This allows defining reusable logging functions with fixed labels
+   * and optional templates.
+   *
+   * @template T The name of the custom method (e.g., 'log', 'info').
+   * @param {T} name The name of the preset method.
+   * @param {string} label A predefined label for the preset method.
+   * @param {string} [templateName] The name of the template to use for this method.
+   * @returns {this & { [key in T]: (...args: any[]) => void }} 
+   *          The debuggy instance with the new preset method added.
+   *
+   * @example
+   * ```typescript
+   * const debug = debuggy
+   *   .preset('log', '<bYh>Log Data<s>')
+   *   .preset('info', '<yGh>Info Data<s>', 'myCustom');
+   *
+   * debug.log({ id: 1, message: 'Hello' });
+   * debug.info({ id: 2, message: 'World' });
+   * ```
+   */
+  public preset<T extends string>(
+    name: T,
+    label: string,
+    templateName?: string
+  ): this & { [key in T]: (...args: any[]) => void } {
+    const newMethod = (...args: any[]) => {
+      const fn = this.output(label, undefined, templateName, name);
+      return fn(...args);
+    };
+
+    (this as any)[name] = newMethod;
+
+    return this as this & { [key in T]: (...args: any[]) => void };
+  }
+
 }
+
+// src/index.ts
+// ... (existing imports and classes)
 
 // Global instance for convenience
 const debuggyInstance = new Debuggy();
 
-// Helper to ensure level diteruskan
-function debuggyWithLevel(label: string = '', mode?: string | string[], templateName?: string, level?: string) {
-  return debuggyInstance.output(label, mode, templateName, level);
+// Create a callable function that also has the class methods
+function debuggyWithLevel(label: string = '', mode?: string | string[], templateName?: string) {
+  return debuggyInstance.output(label, mode, templateName);
 }
 
-export const debuggy = debuggyWithLevel as DebuggyInstance;
-(debuggy as any).options = debuggyInstance.options.bind(debuggyInstance);
-(debuggy as any).set = (label: string) => debuggyInstance.output.bind(debuggyInstance, label);
-(debuggy as any).create = debuggyInstance.create.bind(debuggyInstance);
-
-// Set up dynamic methods (info, warn, error, debug)
-['info', 'warn', 'error', 'debug'].forEach(level => {
-  (debuggy as any)[level] = (label: string = '') => {
-    // Gabungkan label dinamis jika ada
-    const fullLabel = label ? `%log ${level.toUpperCase()}: ${label}` : `%log ${level.toUpperCase()}:`;
-    return debuggyInstance.output(fullLabel, undefined, undefined);
-  };
+// Assign the methods from the class instance to the callable function.
+// This is the correct way to merge the function and object properties in JS.
+Object.assign(debuggyWithLevel, {
+  options: debuggyInstance.options.bind(debuggyInstance),
+  label: (label: string, mode?: string | string[], templateName?: string) => {
+    return (...args: any[]) => {
+      const fn = debuggyInstance.output(label, mode, templateName);
+      return fn(...args);
+    };
+  },
+  create: debuggyInstance.create.bind(debuggyInstance),
+  preset: debuggyInstance.preset.bind(debuggyInstance),
 });
 
+// The final export should be typed as DebuggyInstance
+export const debuggy = debuggyWithLevel as DebuggyInstance;
+
+export { debuggyInstance };
 export default debuggy;

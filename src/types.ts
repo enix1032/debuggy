@@ -60,13 +60,17 @@ export type CreateMethodReturnType<T extends string, Prev = DebuggyInstance> = P
 export interface DebuggyInstance {
   (label?: string, mode?: string | string[], templateName?: string): (...args: any[]) => void;
   options: (options: DebuggyOptions) => void;
-  set: (label: string) => (...args: any[]) => void;
-  create: <T extends string>(
+  label: (label: string) => (...args: any[]) => void;
+  create: <T extends string, This extends DebuggyInstance>(
+    this: This,
     name: T,
     label: string,
     templateName?: string
-  ) => CreateMethodReturnType<T, this>;
-  info: (label?: string, ...args: any[]) => void;
-  warn: (label?: string, ...args: any[]) => void;
-  error: (label?: string, ...args: any[]) => void;
+  ) => CreateMethodReturnType<T, This>;
+  preset: <T extends string, This extends DebuggyInstance>(
+    this: This,
+    name: T,
+    label: string,
+    templateName?: string
+  ) => This & { [key in T]: (...args: any[]) => void };
 }

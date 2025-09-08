@@ -55,3 +55,10 @@ debug.error('Error Label')(sampleData);
 debuggy
   .create('info', '<ch>{label}<s>')
   .info('Info Label')('This is an info message.');
+
+const bug = debuggy
+  .preset('log', '<bYh>Log Data<s>')
+  .preset('info', '<yGh>Info Data<s>', 'myCustom');
+
+bug.log({ id: 1, message: 'Hello' });
+bug.info({ id: 2, message: 'World' });

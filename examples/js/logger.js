@@ -5,9 +5,8 @@
  */
 
 import { debuggy } from '@en32/debuggy';
-//import Logger, { LogLevel } from '@en32/logger';
-import Logger, { LogLevel } from './../../logger/index.js';
-
+import { Logger, LogLevel } from '@en32/logger';
+// import Logger, { LogLevel } from './../../logger/index.js';
 // Adjust based on your environment: DEVELOPMENT, PRODUCTION, TESTING, or ALL (always active).
 const isAllowed = true;
 
@@ -15,6 +14,7 @@ const isAllowed = true;
  * @type {Logger}
  */
 const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, isAllowed, 5000);
+console.log(logger)
 
 /**
  * 2. Configure debuggy to use the logger.
@@ -28,7 +28,7 @@ debuggy.options({
       const location = { path, line, column };
 
       if (logger[level]) {
-        logger[level](message, location);
+        logger.create(level, message, location);
       } else {
         logger.info(message, location);
       }
