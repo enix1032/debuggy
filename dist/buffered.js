@@ -129,6 +129,7 @@ var inlineString = (str, options) => {
 };
 
 // src/debuggy.ts
+var __filename = "/home/enix90s/Github/enix90s/debuggy-v2/src/debuggy.ts";
 var isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === "debuggy";
 
 class Debuggy {
@@ -155,15 +156,31 @@ class Debuggy {
   }
   catchError(logger = false) {
     let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
+    const normalizeForCompare = (p) => p.replace(/\\/g, "/");
     try {
       throw new Error;
     } catch (error) {
-      let stacks = [];
-      if (error instanceof Error) {
-        stacks = (error.stack?.split(/\n/m) ?? []).map((item) => item.trim()).slice(1);
-        const stackIndex = (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0);
-        const str = stacks[stackIndex + (logger ? 1 : 0)];
-        parsedStack = parseStackTraceLine(str);
+      if (error instanceof Error && error.stack) {
+        const stacks = error.stack.split(/\n/m).map((line) => line.trim()).slice(1);
+        const mode = this._options.stackMode ?? "index";
+        if ((mode === "filename" || mode === "auto") && typeof __filename === "string") {
+          const filenameNorm = normalizeForCompare(__filename);
+          const found = stacks.find((line) => normalizeForCompare(line).includes(filenameNorm));
+          if (found) {
+            parsedStack = parseStackTraceLine(found);
+            return parsedStack;
+          }
+          if (mode === "filename") {
+            return parsedStack;
+          }
+        }
+        if (mode === "index" || mode === "auto") {
+          const stackIndex = (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0);
+          const str = stacks[stackIndex + (logger ? 1 : 0)];
+          if (str) {
+            parsedStack = parseStackTraceLine(str);
+          }
+        }
       }
     }
     return parsedStack;

@@ -250,7 +250,8 @@ Update the global configuration.
   * `templateActive`: Default template.
   * `templates`: Custom template definitions.
   * `dateFormatter`: Custom date formatter.
-  * `stackFileIndex`: Index for stack trace.
+  * `stackFileIndex`: Index for stack trace (number).
+  * `stackMode`: _index_, _filename_, or, _auto_ (string).
   * `logger`: File logging config.
 
 ### `debuggy.create(name, label, templateName?)`

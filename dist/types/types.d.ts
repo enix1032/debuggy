@@ -13,6 +13,7 @@ export interface DebuggyOptions {
     };
     dateFormatter?: (date: Date) => string;
     stackFileIndex?: number;
+    stackMode?: "index" | "filename" | "auto";
     logger?: {
         write: boolean;
         saveMethod?: (data: LogData) => void;
