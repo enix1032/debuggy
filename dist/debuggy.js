@@ -12,10 +12,10 @@ var __export = (target, all) => {
 // src/utils.ts
 var exports_utils = {};
 __export(exports_utils, {
-  welcomeMessage: () => welcomeMessage,
   splitAndCleanString: () => splitAndCleanString,
   parseStackTraceLine: () => parseStackTraceLine,
   inlineString: () => inlineString,
+  header: () => header,
   customDateFormatter: () => customDateFormatter,
   colorsCode: () => colorsCode,
   _tpl: () => _tpl
@@ -104,15 +104,34 @@ var parseStackTraceLine = (line) => {
     column: columnStr ? parseInt(columnStr, 10) : 1
   };
 };
-var welcomeMessage = () => {
-  const spacer = (n, w = " ") => String(w).repeat(n);
-  const { group, groupEnd } = console;
-  group(_tpl(`
-` + `<E>${spacer(34)}<s>
+var header = (options, showsWelcome = true, showsOptions = false) => {
+  const { group, groupEnd, table, log } = console;
+  if (showsWelcome) {
+    group(_tpl(`
+` + `<E>${"".padEnd(34, " ")}<s>
 ` + `<Ehr>   <Ehy>deBuggy<s><Ehw> is starting here....   <s>
-` + `<E>${spacer(34)}<s>
+` + `<E>${"".padEnd(34, " ")}<s>
 `));
-  groupEnd();
+    groupEnd();
+  }
+  if (showsOptions) {
+    if (!!!process.versions?.bun)
+      log("\x1B[40m\x1B[92m");
+    const opts = {
+      enabledTags: options.enabledTags ?? "*",
+      stackTraceMode: options.stackTraceMode ?? "index",
+      stackTraceIndex: options.stackTraceIndex,
+      defaultTemplate: options.activeTemplate ?? "default",
+      customTemplates: Object.keys(options.templates || {}).join(", ")
+    };
+    if (options.stackMode && options.stackMode !== "index")
+      delete opts["stackTraceIndex"];
+    table(opts);
+    if (!!!process.versions?.bun)
+      log("\x1B[0m");
+    else
+      log();
+  }
 };
 var inlineString = (str, options) => {
   const inlinedStr = str.split(`
@@ -135,24 +154,62 @@ var isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === "debugg
 class Debuggy {
   _options;
   constructor(options = {}) {
+    options = this.normalizeOptions(options);
     this._options = {
-      stackFileIndex: 3,
-      templateActive: "default",
+      stackTraceIndex: 3,
+      activeTemplate: "default",
       templates: {},
       dateFormatter: undefined,
       logger: {
-        write: false,
+        enabled: false,
         saveMethod: undefined
       },
       ...options
     };
-    welcomeMessage();
+    if (isEnabled) {
+      header(this._options);
+    }
   }
   options(options) {
+    options = this.normalizeOptions(options);
     if (options.logger) {
       this._options.logger = { ...this._options.logger, ...options.logger };
     }
     Object.assign(this._options, options);
+    if (isEnabled && this._options?.displayHeader) {
+      header(this._options, false, true);
+    }
+  }
+  normalizeOptions(options) {
+    const normalized = { ...options };
+    if (options.shows && !options.enabledTags) {
+      console.warn('[debuggy] ⚠️ "shows" is deprecated, use "enabledTags" instead.');
+      normalized.enabledTags = options.shows;
+    }
+    if (options.templateActive && !options.activeTemplate) {
+      console.warn('[debuggy] ⚠️ "templateActive" is deprecated, use "activeTemplate" instead.');
+      normalized.activeTemplate = options.templateActive;
+    }
+    if (options.stackFileIndex && !options.stackTraceIndex) {
+      console.warn('[debuggy] ⚠️ "stackFileIndex" is deprecated, use "stackTraceIndex" instead.');
+      normalized.stackTraceIndex = options.stackFileIndex;
+    }
+    if (options.stackMode && !options.stackTraceMode) {
+      console.warn('[debuggy] ⚠️ "stackMode" is deprecated, use "stackTraceMode" instead.');
+      normalized.stackTraceMode = options.stackMode;
+    }
+    if (options.showsHeader && !options.displayHeader) {
+      console.warn('[debuggy] ⚠️ "showsHeader" is deprecated, use "displayHeader" instead.');
+      normalized.displayHeader = options.showsHeader;
+    }
+    if (options.logger?.write !== undefined && normalized.logger?.enabled === undefined) {
+      console.warn('[debuggy] ⚠️ "logger.write" is deprecated, use "logger.enabled" instead.');
+      normalized.logger = {
+        ...normalized.logger,
+        enabled: options.logger.write
+      };
+    }
+    return normalized;
   }
   catchError(logger = false) {
     let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };

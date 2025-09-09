@@ -12,10 +12,10 @@ var __export = (target, all) => {
 // src/utils.ts
 var exports_utils = {};
 __export(exports_utils, {
-  welcomeMessage: () => welcomeMessage,
   splitAndCleanString: () => splitAndCleanString,
   parseStackTraceLine: () => parseStackTraceLine,
   inlineString: () => inlineString,
+  header: () => header,
   customDateFormatter: () => customDateFormatter,
   colorsCode: () => colorsCode,
   _tpl: () => _tpl
@@ -104,15 +104,34 @@ var parseStackTraceLine = (line) => {
     column: columnStr ? parseInt(columnStr, 10) : 1
   };
 };
-var welcomeMessage = () => {
-  const spacer = (n, w = " ") => String(w).repeat(n);
-  const { group, groupEnd } = console;
-  group(_tpl(`
-` + `<E>${spacer(34)}<s>
+var header = (options, showsWelcome = true, showsOptions = false) => {
+  const { group, groupEnd, table, log } = console;
+  if (showsWelcome) {
+    group(_tpl(`
+` + `<E>${"".padEnd(34, " ")}<s>
 ` + `<Ehr>   <Ehy>deBuggy<s><Ehw> is starting here....   <s>
-` + `<E>${spacer(34)}<s>
+` + `<E>${"".padEnd(34, " ")}<s>
 `));
-  groupEnd();
+    groupEnd();
+  }
+  if (showsOptions) {
+    if (!!!process.versions?.bun)
+      log("\x1B[40m\x1B[92m");
+    const opts = {
+      enabledTags: options.enabledTags ?? "*",
+      stackTraceMode: options.stackTraceMode ?? "index",
+      stackTraceIndex: options.stackTraceIndex,
+      defaultTemplate: options.activeTemplate ?? "default",
+      customTemplates: Object.keys(options.templates || {}).join(", ")
+    };
+    if (options.stackMode && options.stackMode !== "index")
+      delete opts["stackTraceIndex"];
+    table(opts);
+    if (!!!process.versions?.bun)
+      log("\x1B[0m");
+    else
+      log();
+  }
 };
 var inlineString = (str, options) => {
   const inlinedStr = str.split(`
@@ -128,10 +147,10 @@ var inlineString = (str, options) => {
   return inlinedStr;
 };
 export {
-  welcomeMessage,
   splitAndCleanString,
   parseStackTraceLine,
   inlineString,
+  header,
   customDateFormatter,
   colorsCode,
   _tpl

@@ -1,3 +1,4 @@
+import { DebuggyOptions } from "./types";
 /**
  * src/utils.ts
  *
@@ -65,9 +66,9 @@ export declare const parseStackTraceLine: (line: string) => {
     column: number;
 };
 /**
- * Welcome Message
+ * Header Message
  */
-export declare const welcomeMessage: () => void;
+export declare const header: (options: DebuggyOptions, showsWelcome?: boolean, showsOptions?: boolean) => void;
 /**
  * Inlines a multiline string by joining lines and trimming excess whitespace. Optionally truncates the string.
  *
