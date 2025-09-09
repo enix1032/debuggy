@@ -113,6 +113,17 @@ const sampleData = { id: 1, message: 'This is a sample message.' };
 debug.warn('Warning Label')(sampleData);
 debug.error('Error Label')(sampleData);
 
+// Simple
+const deWarn = debuggy.create('warn', '[WARN] <rYh>{label}<s>').warn
+const deError = debuggy.create('error', '[ERROR] <yRh>{label}<s>').error
+const deSQL = debuggy.create('sql', '[SQL] <yRh>{label}<s>').sql
+
+deWarn('Warning Label #1')(sampleData);
+deError('Error Label')(sampleData);
+
+deWarn('Warning Label #2')(sampleData);
+deSQL('SQL Query')(sampleSQLString);
+
 // One-off chained usage
 debuggy
   .create('info', '<ch>{label}<s>')
