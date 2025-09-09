@@ -1,4 +1,4 @@
-import { _tpl, parseStackTraceLine, splitAndCleanString, welcomeMessage } from './utils';
+import { _tpl, parseStackTraceLine, splitAndCleanString, header } from './utils';
 import { DebuggyOptions, TemplateParams, DebuggyInstance, CreateMethodReturnType, LogData } from './types';
 export * as utils from './utils'
 
@@ -20,18 +20,24 @@ export class Debuggy {
    * @param {DebuggyOptions} options - The configuration options for Debuggy.
    */
   constructor(options: DebuggyOptions = {}) {
+    // --- normalize deprecated fields ---
+    options = this.normalizeOptions(options);
+
     this._options = {
-      stackFileIndex: 3,
-      templateActive: 'default',
+      stackTraceIndex: 3,
+      activeTemplate: "default",
       templates: {},
       dateFormatter: undefined,
       logger: {
-        write: false,
+        enabled: false,
         saveMethod: undefined,
       },
       ...options,
     };
-    welcomeMessage();
+
+    if (isEnabled) {
+      header(this._options);
+    }
   }
 
   /**
@@ -39,10 +45,57 @@ export class Debuggy {
    * @param {DebuggyOptions} options - The options to configure Debuggy with.
    */
   public options(options: DebuggyOptions) {
+    // --- normalize deprecated fields ---
+    options = this.normalizeOptions(options);
+
     if (options.logger) {
       this._options.logger = { ...this._options.logger, ...options.logger };
     }
+
     Object.assign(this._options, options);
+
+    if (isEnabled && this._options?.displayHeader) {
+      header(this._options, false, true);
+    }
+  }
+
+  /**
+   * Normalize deprecated option names into their new counterparts.
+   * Ensures backward compatibility.
+   * @internal
+   */
+  private normalizeOptions(options: DebuggyOptions): DebuggyOptions {
+    const normalized: DebuggyOptions = { ...options };
+
+    if (options.shows && !options.enabledTags) {
+      console.warn('[debuggy] ⚠️ "shows" is deprecated, use "enabledTags" instead.');
+      normalized.enabledTags = options.shows;
+    }
+    if (options.templateActive && !options.activeTemplate) {
+      console.warn('[debuggy] ⚠️ "templateActive" is deprecated, use "activeTemplate" instead.');
+      normalized.activeTemplate = options.templateActive;
+    }
+    if (options.stackFileIndex && !options.stackTraceIndex) {
+      console.warn('[debuggy] ⚠️ "stackFileIndex" is deprecated, use "stackTraceIndex" instead.');
+      normalized.stackTraceIndex = options.stackFileIndex;
+    }
+    if (options.stackMode && !options.stackTraceMode) {
+      console.warn('[debuggy] ⚠️ "stackMode" is deprecated, use "stackTraceMode" instead.');
+      normalized.stackTraceMode = options.stackMode;
+    }
+    if (options.showsHeader && !options.displayHeader) {
+      console.warn('[debuggy] ⚠️ "showsHeader" is deprecated, use "displayHeader" instead.');
+      normalized.displayHeader = options.showsHeader;
+    }
+    if (options.logger?.write !== undefined && normalized.logger?.enabled === undefined) {
+      console.warn('[debuggy] ⚠️ "logger.write" is deprecated, use "logger.enabled" instead.');
+      normalized.logger = {
+        ...normalized.logger,
+        enabled: options.logger.write,
+      };
+    }
+
+    return normalized;
   }
 
   /**
@@ -50,6 +103,54 @@ export class Debuggy {
    * @param {boolean} logger 
    * @returns 
    */
+  private catchError(logger: boolean = false): Omit<LogData, 'label'> {
+    let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
+
+    const normalizeForCompare = (p: string) => p.replace(/\\/g, "/");
+
+    try {
+      throw new Error();
+    } catch (error) {
+      if (error instanceof Error && error.stack) {
+        const stacks = error.stack
+          .split(/\n/m)
+          .map(line => line.trim())
+          .slice(1);
+
+        const mode = this._options.stackMode ?? "index";
+
+        // --- Mode: filename / auto ---
+        if ((mode === "filename" || mode === "auto") && typeof __filename === "string") {
+          const filenameNorm = normalizeForCompare(__filename);
+          const found = stacks.find(line => normalizeForCompare(line).includes(filenameNorm));
+
+          if (found) {
+            parsedStack = parseStackTraceLine(found);
+            return parsedStack;
+          }
+
+          // Auto fallback ke index, kalau filename gagal
+          if (mode === "filename") {
+            return parsedStack; // gagal, tapi tidak fallback
+          }
+        }
+
+        // --- Mode: index / auto fallback ---
+        if (mode === "index" || mode === "auto") {
+          const stackIndex =
+            (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0);
+          const str = stacks[stackIndex + (logger ? 1 : 0)];
+          if (str) {
+            parsedStack = parseStackTraceLine(str);
+          }
+        }
+      }
+    }
+
+    return parsedStack;
+  }
+
+  /*
   private catchError (logger: boolean = false): Omit<LogData, 'label'> {
     let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
 
@@ -65,6 +166,9 @@ export class Debuggy {
           .slice(1)
         ;
 
+        // console.log('__filename', __filename)
+        // console.log('stacks', stacks)
+
         const stackIndex = (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0)
         const str = stacks[stackIndex + (logger ? 1 : 0)]
         parsedStack = parseStackTraceLine(str)
@@ -73,6 +177,7 @@ export class Debuggy {
 
     return parsedStack
   }
+  */
 
   /**
    * The main output function. Returns a function to log arguments.
@@ -369,9 +474,6 @@ export class Debuggy {
   }
 
 }
-
-// src/index.ts
-// ... (existing imports and classes)
 
 // Global instance for convenience
 const debuggyInstance = new Debuggy();

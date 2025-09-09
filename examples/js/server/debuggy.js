@@ -2,7 +2,7 @@ import { debuggy } from '@en32/debuggy';
 
 // Configure debuggy with custom options
 debuggy.options({
-  // shows: 'API,DB',
+  enabledTags: 'API,DB',
 });
 
 globalThis.debuggy = debuggy

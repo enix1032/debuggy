@@ -3,4 +3,5 @@
 
 // import { debuggy } from './dist/index.js';
 import { debuggy } from '@en32/debuggy';
+
 globalThis.debuggy = debuggy;

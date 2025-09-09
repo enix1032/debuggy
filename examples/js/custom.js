@@ -2,8 +2,8 @@ import { debuggy } from '@en32/debuggy';
 
 // Configure debuggy with custom options
 debuggy.options({
-  // shows: 'API,DB',
-  templateActive: 'myCustom',
+  // enabledTags: 'API,DB',
+  activeTemplate: 'myCustom',
   templates: {
     myCustom: {
       head: ({ template, tokens }) => {

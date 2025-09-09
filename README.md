@@ -113,6 +113,17 @@ const sampleData = { id: 1, message: 'This is a sample message.' };
 debug.warn('Warning Label')(sampleData);
 debug.error('Error Label')(sampleData);
 
+// Simple
+const deWarn = debuggy.create('warn', '[WARN] <rYh>{label}<s>').warn
+const deError = debuggy.create('error', '[ERROR] <yRh>{label}<s>').error
+const deSQL = debuggy.create('sql', '[SQL] <yRh>{label}<s>').sql
+
+deWarn('Warning Label #1')(sampleData);
+deError('Error Label')(sampleData);
+
+deWarn('Warning Label #2')(sampleData);
+deSQL('SQL Query')(sampleSQLString);
+
 // One-off chained usage
 debuggy
   .create('info', '<ch>{label}<s>')
@@ -123,7 +134,7 @@ debuggy
 
 ```typescript
 debuggy.options({
-  templateActive: 'myCustom',
+  activeTemplate: 'myCustom',
   templates: {
     myCustom: {
       head: ({ template, tokens }) => {
@@ -193,6 +204,7 @@ import { Logger, LogLevel } from '@en32/logger';
 const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, true, 5000);
 
 debuggy.options({
+  enabledTags: 'DEBUG|SQL|VLD',
   logger: {
     write: true,
     saveMethod: ({ args, path, line, column, level }) => {
@@ -235,11 +247,12 @@ Main debug function. Returns a function to log the actual arguments.
 
 Update the global configuration.
 
-  * `shows`: Tags to enable.
-  * `templateActive`: Default template.
+  * `enabledTags`: Tags to enable.
+  * `activeTemplate`: Default template.
   * `templates`: Custom template definitions.
   * `dateFormatter`: Custom date formatter.
-  * `stackFileIndex`: Index for stack trace.
+  * `stackTraceIndex`: Index for stack trace (number).
+  * `stackTraceMode`: _index_, _filename_, or _auto_ (string).
   * `logger`: File logging config.
 
 ### `debuggy.create(name, label, templateName?)`
@@ -386,8 +399,8 @@ import debuggy from '@en32/debuggy';
 
 // Configure debuggy with custom options
 debuggy.options({
-  // shows: 'API,DB',
-  templateActive: 'myCustom',
+  // enabledTags: 'API,DB',
+  activeTemplate: 'myCustom',
   templates: {
     myCustom: {
       head: ({ template, tokens }) => {
@@ -470,7 +483,7 @@ const logger = new Logger('./examples/ts/logs/example.log', LogLevel.DEBUG, isAl
  */
 debuggy.options({
   logger: {
-    write: true,
+    enabled: true,
     saveMethod: ({ args, path, line, column, level }) => {
       const message: string = args?.[0] || '';
       const location = { path, line, column };
@@ -525,7 +538,9 @@ import debuggy from '@en32/debuggy';
 
 // Configure debuggy with custom options
 debuggy.options({
-  // shows: 'API,DB',
+  enabledTags: 'API|DB',
+  stackTraceMode: 'auto',
+  displayHeader: true,
 });
 
 globalThis.debuggy = debuggy
@@ -597,7 +612,7 @@ debuggy('<hBy>Colored Log with Background')(data);
 // Creating a shortcut
 
 // This works, but the output line remains the same. Not recommended. Can be used if necessary.
-const debug = debuggy('Debug: <yh>always line 42<s>');
+const debug = debuggy('Debug: <yh>always line 41<s>');
 debug('debug here...');
 debug('here...');
 debug('and here...');

@@ -1,3 +1,5 @@
+import { DebuggyOptions } from "./types";
+
 /**
  * src/utils.ts
  *
@@ -143,18 +145,36 @@ export const parseStackTraceLine = (line: string): { at: string, file: string, l
 };
 
 /**
- * Welcome Message
+ * Header Message
  */
-export const welcomeMessage = (): void => {
-  const spacer = (n: number, w = ' ') => String(w).repeat(n)
-  const { group, groupEnd } = console
-  group(_tpl(
-    `\n` +
-    `<E>${spacer(34)}<s>\n` +
-    `<Ehr>   <Ehy>deBuggy<s><Ehw> is starting here....   <s>\n` +
-    `<E>${spacer(34)}<s>\n`
-  ))
-  groupEnd()
+export const header = (options: DebuggyOptions, showsWelcome: boolean = true, showsOptions: boolean = false): void => {
+  const { group, groupEnd, table, log } = console
+
+  if(showsWelcome) {
+    group(
+      _tpl(
+      `\n` +
+      `<E>${''.padEnd(34, ' ')}<s>\n` +
+      `<Ehr>   <Ehy>deBuggy<s><Ehw> is starting here....   <s>\n` +
+      `<E>${''.padEnd(34, ' ')}<s>\n`,
+      )
+    )
+    groupEnd()
+  }
+
+  if(showsOptions) {
+    if(!!!process.versions?.bun) log('\x1b[40m\x1b[92m');
+    const opts = {
+      enabledTags: options.enabledTags ?? '*',
+      stackTraceMode: options.stackTraceMode ?? 'index',
+      stackTraceIndex: options.stackTraceIndex,
+      defaultTemplate: options.activeTemplate ?? 'default',
+      customTemplates: Object.keys(options.templates || {}).join(', '),
+    }
+    if(options.stackMode && options.stackMode !== 'index') delete opts['stackTraceIndex'];
+    table(opts)
+    if(!!!process.versions?.bun) log('\x1b[0m'); else log();
+  }
 }
 
 /**

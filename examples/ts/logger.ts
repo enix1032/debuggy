@@ -21,7 +21,7 @@ const logger = new Logger('./examples/ts/logs/example.log', LogLevel.DEBUG, isAl
  */
 debuggy.options({
   logger: {
-    write: true,
+    enabled: true,
     saveMethod: ({ args, path, line, column, level }) => {
       const message: string = args?.[0] || '';
       const location = { path, line, column };

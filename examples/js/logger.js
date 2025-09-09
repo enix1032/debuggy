@@ -14,14 +14,13 @@ const isAllowed = true;
  * @type {Logger}
  */
 const logger = new Logger('./examples/logs/example.log', LogLevel.DEBUG, isAllowed, 5000);
-console.log(logger)
 
 /**
  * 2. Configure debuggy to use the logger.
  */
 debuggy.options({
   logger: {
-    write: true,
+    enabled: true,
     saveMethod: (params) => {
       const { args, path, line, column, level } = params;
       const message = args[0];

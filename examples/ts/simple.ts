@@ -38,7 +38,7 @@ debuggy('<hBy>Colored Log with Background')(data);
 // Creating a shortcut
 
 // This works, but the output line remains the same. Not recommended. Can be used if necessary.
-const debug = debuggy('Debug: <yh>always line 42<s>');
+const debug = debuggy('Debug: <yh>always line 41<s>');
 debug('debug here...');
 debug('here...');
 debug('and here...');

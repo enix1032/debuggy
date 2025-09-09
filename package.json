@@ -1,13 +1,14 @@
 {
   "name": "@en32/debuggy",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A simple debug logger.",
   "main": "dist/debuggy.js",
   "module": "src/debuggy.ts",
   "type": "module",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/types/debuggy.d.ts",
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/debuggy.js"
     },
     "./global": {
@@ -25,7 +26,7 @@
   },
   "scripts": {
     "build": "bun build.ts",
-    "build:watch": "bun build.ts --watch",
+    "build:watch": "bun run build.ts --watch",
     "build:tsc": "tsc",
     "ex:custom:js": "DEBUG=debuggy nodemon ./examples/js/custom.js",
     "ex:custom:ts": "DEBUG=debuggy bun run --hot ./examples/ts/custom.ts",
