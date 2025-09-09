@@ -1,13 +1,14 @@
 {
   "name": "@en32/debuggy",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "A simple debug logger.",
   "main": "dist/debuggy.js",
   "module": "src/debuggy.ts",
+  "types": "dist/types/index.d.ts",
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/types/debuggy.d.ts",
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/debuggy.js"
     },
     "./global": {

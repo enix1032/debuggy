@@ -51,14 +51,26 @@ export type CreateMethodReturnType<T extends string, Prev = DebuggyInstance> = P
     [key in T]: (dynamicLabel?: string) => (...args: any[]) => void;
 };
 /**
+ * Type alias for the `label()` method.
+ */
+export type LabelFn = (label: string) => (...args: unknown[]) => void;
+/**
+ * Type alias for the `create()` method.
+ */
+export type CreateFn = <T extends string, This extends DebuggyInstance>(this: This, name: T, label: string, templateName?: string) => CreateMethodReturnType<T, This>;
+/**
+ * Type alias for the `preset()` method.
+ */
+export type PresetFn = <T extends string, This extends DebuggyInstance>(this: This, name: T, label: string, templateName?: string) => This & {
+    [key in T]: (...args: any[]) => void;
+};
+/**
  * Interface for the main debuggy function instance.
  */
 export interface DebuggyInstance {
     (label?: string, mode?: string | string[], templateName?: string): (...args: any[]) => void;
     options: (options: DebuggyOptions) => void;
-    label: (label: string) => (...args: any[]) => void;
-    create: <T extends string, This extends DebuggyInstance>(this: This, name: T, label: string, templateName?: string) => CreateMethodReturnType<T, This>;
-    preset: <T extends string, This extends DebuggyInstance>(this: This, name: T, label: string, templateName?: string) => This & {
-        [key in T]: (...args: any[]) => void;
-    };
+    label: LabelFn;
+    create: CreateFn;
+    preset: PresetFn;
 }
