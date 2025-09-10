@@ -1,6 +1,6 @@
 {
   "name": "@en32/debuggy",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "A simple debug logger.",
   "main": "dist/debuggy.js",
   "module": "src/debuggy.ts",
@@ -34,8 +34,9 @@
     "ex:simple:ts": "DEBUG=debuggy bun run --hot ./examples/ts/simple.ts",
     "ex:server:js": "DEBUG=debuggy nodemon ./examples/js/server/index.js",
     "ex:server:ts": "DEBUG=debuggy bun --hot ./examples/ts/server/index.ts",
-    "ex:buffer:js": "DEBUG=debuggy nodemon ./examples/js/buffered.js",
-    "ex:buffer:ts": "bun run --hot ./examples/ts/buffered.ts",
+    "ex:buffer:js": "nodemon ./examples/js/buffered.js",
+    "ex:buffer:js:debug": "DEBUG=debuggy nodemon ./examples/js/buffered.js",
+    "ex:buffer:ts": "DEBUG=debuggy bun run --hot ./examples/ts/buffered.ts",
     "ex:logger:js": "DEBUG=debuggy nodemon ./examples/js/logger.js",
     "ex:logger:ts": "bun run --hot ./examples/ts/logger.ts",
     "ex:logger:ts:debug": "DEBUG=debuggy bun run --hot ./examples/ts/logger.ts"

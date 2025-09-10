@@ -1,5 +1,5 @@
 import { _tpl, parseStackTraceLine, splitAndCleanString, header } from './utils';
-import { DebuggyOptions, TemplateParams, DebuggyInstance, CreateMethodReturnType, LogData } from './types';
+import { DebuggyOptions, TemplateParams, DebuggyInstance, CreateMethodReturnType, LogData, IntervalLoggerWithDispose, AsyncLoggerWithDispose } from './types';
 export * as utils from './utils'
 
 // Environment check
@@ -16,6 +16,10 @@ export class Debuggy {
   private _options: DebuggyOptions;
 
   /**
+   * @internal
+   */
+  private _countMap: Map<string, number>;
+  /**
    * Creates an instance of Debuggy.
    * @param {DebuggyOptions} options - The configuration options for Debuggy.
    */
@@ -24,10 +28,11 @@ export class Debuggy {
     options = this.normalizeOptions(options);
 
     this._options = {
-      stackTraceIndex: 3,
+      stackTraceIndex: 2,
       activeTemplate: "default",
       templates: {},
       dateFormatter: undefined,
+      useCounter: true,
       logger: {
         enabled: false,
         saveMethod: undefined,
@@ -36,7 +41,16 @@ export class Debuggy {
     };
 
     if (isEnabled) {
+      const globalKey = "__debuggy_countMap";
+      if (!(globalKey in globalThis)) {
+        (globalThis as any)[globalKey] = new Map<string, number>();
+      }
+      this._countMap = (globalThis as any)[globalKey];
+
       header(this._options);
+
+    } else {
+      this._countMap = new Map(); // fallback dummy map
     }
   }
 
@@ -65,6 +79,8 @@ export class Debuggy {
    * @internal
    */
   private normalizeOptions(options: DebuggyOptions): DebuggyOptions {
+    if(!isEnabled) return options;
+
     const normalized: DebuggyOptions = { ...options };
 
     if (options.shows && !options.enabledTags) {
@@ -100,11 +116,14 @@ export class Debuggy {
 
   /**
    * @internal
-   * @param {boolean} logger 
-   * @returns 
+   * @param {boolean} buffered
+   * @param {boolean} logger
+   * @returns
    */
-  private catchError(logger: boolean = false): Omit<LogData, 'label'> {
+  private _catchError(buffered: boolean = false): Omit<LogData, 'label'> {
     let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
+
+    if(!isEnabled) return parsedStack;
 
     const normalizeForCompare = (p: string) => p.replace(/\\/g, "/");
 
@@ -115,14 +134,15 @@ export class Debuggy {
         const stacks = error.stack
           .split(/\n/m)
           .map(line => line.trim())
+          // .filter(line => !line.includes('/dist/debuggy.js') || !line.includes('/src/debuggy.ts')) // Filter out internal files
           .slice(1);
-
-        const mode = this._options.stackMode ?? "index";
+        
+        const mode = this._options.stackTraceMode ?? "index";
 
         // --- Mode: filename / auto ---
         if ((mode === "filename" || mode === "auto") && typeof __filename === "string") {
           const filenameNorm = normalizeForCompare(__filename);
-          const found = stacks.find(line => normalizeForCompare(line).includes(filenameNorm));
+          const found = stacks.find(line => normalizeForCompare(line).includes(filenameNorm + ':'));
 
           if (found) {
             parsedStack = parseStackTraceLine(found);
@@ -135,11 +155,17 @@ export class Debuggy {
           }
         }
 
+        const logger = this._options.logger?.enabled
+        console.log(logger)
         // --- Mode: index / auto fallback ---
         if (mode === "index" || mode === "auto") {
-          const stackIndex =
-            (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0);
-          const str = stacks[stackIndex + (logger ? 1 : 0)];
+          let stackTraceIndex = this._options.stackTraceIndex || 2
+          if(logger) stackTraceIndex = (process.versions?.bun ? -1 : 0);
+          if(buffered) {
+            stackTraceIndex = stackTraceIndex + 0
+          };
+
+          const str = stacks[stackTraceIndex + (logger ? 1 : 0)];
           if (str) {
             parsedStack = parseStackTraceLine(str);
           }
@@ -149,35 +175,6 @@ export class Debuggy {
 
     return parsedStack;
   }
-
-  /*
-  private catchError (logger: boolean = false): Omit<LogData, 'label'> {
-    let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
-
-    try{
-      throw new Error() //('[DEBUGGY] ' + label.replace(/\<[\w]+\>/ig, '').trim())
-    }
-    catch(error){
-      let stacks: string[] = []
-
-      if (error instanceof Error) {
-        stacks = (error.stack?.split(/\n/m) ?? [])
-          .map((item: string) => item.trim())
-          .slice(1)
-        ;
-
-        // console.log('__filename', __filename)
-        // console.log('stacks', stacks)
-
-        const stackIndex = (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0)
-        const str = stacks[stackIndex + (logger ? 1 : 0)]
-        parsedStack = parseStackTraceLine(str)
-      }
-    }
-
-    return parsedStack
-  }
-  */
 
   /**
    * The main output function. Returns a function to log arguments.
@@ -193,8 +190,9 @@ export class Debuggy {
     templateName?: string,
     level?: string
   ): (...args: any[]) => void {
-    // const { shows, stackFileIndex, logger } = this._options;
     const { shows, logger } = this._options;
+
+    if(!isEnabled && !logger?.write) return () => {};
 
     let prefix = '';
     const tagMatch = /^\[(?<prefix>[A-Z\_\-]+)\]/.exec(label);
@@ -211,7 +209,7 @@ export class Debuggy {
     const logToFile = (args: any[]) => {
       if (logger?.write && logger.saveMethod && shouldLogToFile) {
         let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
-        parsedStack = this.catchError(true);
+        parsedStack = this._catchError(true);
 
         const logData: LogData = {
           label: label || parsedStack.at,
@@ -226,13 +224,13 @@ export class Debuggy {
         });
       }
     };
-    
+
     // Return early if not enabled and not logging to file
     if (!shouldDisplay && !shouldLogToFile) {
       return () => {};
     }
 
-    let templateToUse = templateName || this._options.templateActive;
+    let templateToUse = templateName || this._options.activeTemplate;
     let finalLabel = label;
     let finalMode = mode;
 
@@ -240,25 +238,33 @@ export class Debuggy {
     if (typeof mode === 'string' && (mode.includes('%j') || mode.includes('%t') || mode.includes('%log'))) {
       finalLabel = mode.replace(/\%[\w]/ig, '').trim();
       finalMode = mode;
-      templateToUse = this._options.templateActive;
+      templateToUse = this._options.activeTemplate;
     } else if (typeof label === 'string' && (label.includes('%j') || label.includes('%t') || label.includes('%log'))) {
       finalMode = label;
       finalLabel = label.replace(/\%[\w]+/ig, '').trim();
     }
 
-    // Get stack trace for file, line, and column
-    let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
-    parsedStack = this.catchError()
-
-    const logData: LogData = {
-      label: finalLabel || parsedStack.at,
-      ...parsedStack,
-      level: level || 'info'
-    };
-
     return (...args: any[]) => {
+      // Get stack trace for file, line, and column dynamically
+      let parsedStack: Omit<LogData, 'label'> = { at: 'N/A', file: '', line: 0, column: 0 };
+      parsedStack = this._catchError()
+
+      const logData: LogData = {
+        label: finalLabel || parsedStack.at,
+        ...parsedStack,
+        level: level || 'info'
+      };
+
+      // --- handle counter ---
+      let counter = 0;
+      if (this._options.useCounter) {
+        counter = (this._countMap.get(label) || 0) + 1;
+        logData.count = counter
+        this._countMap.set(label, counter);
+      }
+
       if (shouldDisplay) {
-        this.displayLog({
+        this._displayLog({
           label: finalLabel,
           args,
           mode: finalMode,
@@ -296,15 +302,15 @@ export class Debuggy {
 
     // Use a type assertion to add the new method to 'this'
     (this as any)[name] = newMethod;
-    
+
     return this as this & CreateMethodReturnType<T>;
   }
 
   /**
    * Shorthand Template
    * @internal
-   * @param tpl 
-   * @param executedTime 
+   * @param tpl
+   * @param executedTime
    */
   private executeTimeTemplate(tpl: Function, executedTime: string) {
     console.log(tpl(`<hy>---------------------<s>`, { executedTime }));
@@ -321,7 +327,7 @@ export class Debuggy {
    * @param {string} params.templateName - The name of the template to use.
    * @param {LogData} params.data - The log data.
    */
-  private displayLog({ label, args, mode, templateName, data }: {
+  private _displayLog({ label, args, mode, templateName, data }: {
     label: string,
     args: any[],
     mode: string | string[] | undefined,
@@ -329,7 +335,7 @@ export class Debuggy {
     data: LogData,
   }) {
     const { templates, dateFormatter } = this._options;
-    
+
     // Remove `%log` token so it doesn't appear in the console output.
     const sanitizedLabel = typeof label === 'string' ? label.replace('%log', '').trim() : label;
     const sanitizedMode = typeof mode === 'string' ? mode.replace('%log', '').trim() : mode;
@@ -338,7 +344,7 @@ export class Debuggy {
 
     // Helper function for templates to use
     const tpl = (text: string, tokens: any) => _tpl(text, tokens, dateFormatter);
-    
+
     // Parameters for the template functions
     const templateParams: TemplateParams = {
       template: tpl,
@@ -354,19 +360,19 @@ export class Debuggy {
     } else {
       // Default template handling
       if (!activeTemplate || !activeTemplate.head) {
-        console.log(tpl(`<hy>####### <s><h>{label}`, data));
+        console.log(tpl(`<hy>####### <s><h>{label}<s>`, data));
         if (data.at && data.at !== 'N/A') {
-          console.log(tpl(`<hg>at<s>    : <hc>{at}`, data));
+          console.log(tpl(`<hg>at<s>    : <hc>{at}<s>`, data));
         }
-        console.log(tpl(`<hg>file<s>  : <hm>{file}`, data));
+        console.log(tpl(`<hg>file<s>  : <hm>{file}<s>`, data));
         console.log(tpl(`<hg>line<s>  : <hw>{line}<s>`, data));
         console.log(tpl(`<hg>tspan<s> : <h>{datetime}<s>`, {}));
         // console.log(tpl(`<hg>tspan<s> : <h>⌈{datetime}⌋<s>`, {})); // backup simbol `⌈⌋`, :lol
-        console.log(tpl(`---------------------------------------`, {}));
+        console.log(tpl(`--------------------------------------- ${ this._options.useCounter ? '<yh>+{count}<s>' : '' }`, data));
       } else {
         activeTemplate.head(templateParams);
       }
-      
+
       if (!activeTemplate || !activeTemplate.body) {
         if (Array.isArray(sanitizedMode) && sanitizedMode.length === args.length) {
           for (let i = 0; i < args.length; i++) {
@@ -411,7 +417,7 @@ export class Debuggy {
    * @param {number} [groupIndex] - The index of the log group.
    */
   private logByFormat(format: string, arg: any, groupIndex?: number) {
-    
+
     const cleanLabel = format.replace(/\%[\w]/ig, '').trim();
     if (groupIndex) {
       console.log(_tpl(`<gh>#<hy> ${cleanLabel}<s>:`, {}));
@@ -445,34 +451,166 @@ export class Debuggy {
    * @param {T} name The name of the preset method.
    * @param {string} label A predefined label for the preset method.
    * @param {string} [templateName] The name of the template to use for this method.
-   * @returns {this & { [key in T]: (...args: any[]) => void }} 
-   *          The debuggy instance with the new preset method added.
+   * @returns {this & { [key in T]: (...args: any[]) => void }}
+   * The debuggy instance with the new preset method added.
    *
    * @example
    * ```typescript
    * const debug = debuggy
-   *   .preset('log', '<bYh>Log Data<s>')
-   *   .preset('info', '<yGh>Info Data<s>', 'myCustom');
+   * .preset('log', '<bYh>Log Data<s>')
+   * .preset('info', '<yGh>Info Data<s>', 'myCustom');
    *
    * debug.log({ id: 1, message: 'Hello' });
    * debug.info({ id: 2, message: 'World' });
    * ```
    */
-  public preset<T extends string>(
-    name: T,
-    label: string,
-    templateName?: string
-  ): this & { [key in T]: (...args: any[]) => void } {
-    const newMethod = (...args: any[]) => {
+public preset<T extends string>(
+  name: T,
+  label: string,
+  templateName?: string
+): this & { [key in T]: (...args: any[]) => void } {
+  (this as any)[name] = (...args: any[]) => {
+    // sementara naikin index biar tepat
+    const prevIndex = this._options.stackTraceIndex ?? 2;
+    this._options.stackTraceIndex = prevIndex + 1;
+
+    try {
       const fn = this.output(label, undefined, templateName, name);
       return fn(...args);
+    } finally {
+      // balikin lagi supaya tidak pengaruh ke log lain
+      this._options.stackTraceIndex = prevIndex;
+    }
+  };
+
+  return this as this & { [key in T]: (...args: any[]) => void };
+}
+
+  /**
+   * Buffered logger helper.
+   *
+   * Provides two buffering modes:
+   *  - "interval": Collects log calls in a buffer and flushes them every N ms.
+   *  - "async": Exposes an async iterable stream that can be consumed with `for await ... of`.
+   *
+   * Supports `.dispose()` to stop interval or clear async queue.
+   */
+  public buffered(
+    label: string,
+    templateName?: string,
+    options:
+      | { mode: "interval"; interval?: number; flushCallback?: (flushed: any[][]) => void }
+      | { mode: "async" } = { mode: "interval" }
+  ): IntervalLoggerWithDispose | AsyncLoggerWithDispose | undefined {
+
+    // fallback: noop implementation
+    if (!isEnabled) {
+      if (!options || options.mode === "interval") {
+        const dummy: IntervalLoggerWithDispose = (() => {}) as IntervalLoggerWithDispose;
+        dummy.dispose = () => {};
+        return dummy;
+      }
+      if (options.mode === "async") {
+        const dummy: AsyncLoggerWithDispose = {
+          log: () => {},
+          stream: (async function* () {})(), // async generator kosong
+          dispose: () => {},
+        };
+        return dummy;
+      }
+    }
+
+    // helper untuk log dengan stack terbaru
+    const callWithSavedStack = (stack: Omit<LogData, "label">, ...args: any[]) => {
+      const logData: LogData = { label, ...stack, level: "info" };
+
+      // --- handle counter ---
+      let counter = 0;
+      if (this._options.useCounter) {
+        counter = (this._countMap.get(label) || 0) + 1;
+        logData.count = counter;
+        this._countMap.set(label, counter);
+      }
+
+      this._displayLog({
+        label,
+        args,
+        mode: undefined,
+        templateName: templateName || "default",
+        data: logData,
+      });
     };
 
-    (this as any)[name] = newMethod;
+    // --- interval mode ---
+    if (options.mode === "interval") {
+      let buffer: any[] = [];
+      const interval = options.interval ?? 1000;
 
-    return this as this & { [key in T]: (...args: any[]) => void };
+      const timer = setInterval(() => {
+        if (buffer.length > 0) {
+          const flush = [...buffer];
+          buffer = [];
+
+          options.flushCallback?.(flush);
+        }
+      }, interval);
+
+      const fn: IntervalLoggerWithDispose = ((...args: any[]) => {
+        const parsedStack = this._catchError?.(true);
+        callWithSavedStack(parsedStack, ...args);
+        buffer.push(args);
+      }) as IntervalLoggerWithDispose;
+
+      fn.dispose = () => {
+        clearInterval(timer);
+        buffer = [];
+      };
+
+      return fn;
+    }
+
+    // --- async mode ---
+    if (options.mode === "async") {
+      const queue: any[] = [];
+      let resolveNext: (() => void) | null = null;
+      let active = true;
+
+      async function* generator() {
+        while (active) {
+          if (queue.length === 0) {
+            await new Promise<void>((resolve) => (resolveNext = resolve));
+          }
+          while (queue.length > 0) {
+            yield queue.shift();
+          }
+        }
+      }
+
+      const gen = generator();
+
+      const log = (...args: any[]) => {
+        if (!active) return;
+        const parsedStack = this._catchError?.(true)
+        callWithSavedStack(parsedStack, ...args);
+        queue.push(args);
+        if (resolveNext) {
+          resolveNext();
+          resolveNext = null;
+        }
+      };
+
+      const dispose = () => {
+        active = false;
+        queue.length = 0;
+        if (resolveNext) {
+          resolveNext();
+          resolveNext = null;
+        }
+      };
+
+      return { log, stream: gen, dispose };
+    }
   }
-
 }
 
 // Global instance for convenience
@@ -495,6 +633,7 @@ Object.assign(debuggyWithLevel, {
   },
   create: debuggyInstance.create.bind(debuggyInstance),
   preset: debuggyInstance.preset.bind(debuggyInstance),
+  buffered: debuggyInstance.buffered.bind(debuggyInstance),
 });
 
 // The final export should be typed as DebuggyInstance
