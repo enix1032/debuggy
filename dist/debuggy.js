@@ -245,7 +245,6 @@ class Debuggy {
           }
         }
         const logger = this._options.logger?.enabled;
-        console.log(logger);
         if (mode === "index" || mode === "auto") {
           let stackTraceIndex = this._options.stackTraceIndex || 2;
           if (logger)
