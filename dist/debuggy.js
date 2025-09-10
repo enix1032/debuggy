@@ -222,7 +222,7 @@ class Debuggy {
     }
     return normalized;
   }
-  _catchError(buffered = false, logger = false) {
+  _catchError(buffered = false) {
     let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
     if (!isEnabled)
       return parsedStack;
@@ -231,7 +231,7 @@ class Debuggy {
       throw new Error;
     } catch (error) {
       if (error instanceof Error && error.stack) {
-        const stacks = error.stack.split(/\n/m).map((line) => line.trim()).filter((line) => !line.includes("debuggy.ts") && !line.includes("buffered.ts")).slice(1);
+        const stacks = error.stack.split(/\n/m).map((line) => line.trim()).slice(1);
         const mode = this._options.stackTraceMode ?? "index";
         if ((mode === "filename" || mode === "auto") && typeof __filename === "string") {
           const filenameNorm = normalizeForCompare(__filename);
@@ -244,6 +244,8 @@ class Debuggy {
             return parsedStack;
           }
         }
+        const logger = this._options.logger?.enabled;
+        console.log(logger);
         if (mode === "index" || mode === "auto") {
           let stackTraceIndex = this._options.stackTraceIndex || 2;
           if (logger)
@@ -423,11 +425,16 @@ class Debuggy {
     this.executeTimeTemplate(_tpl, executedTime);
   }
   preset(name, label, templateName) {
-    const newMethod = (...args) => {
-      const fn = this.output(label, undefined, templateName, name);
-      return fn(...args);
+    this[name] = (...args) => {
+      const prevIndex = this._options.stackTraceIndex ?? 2;
+      this._options.stackTraceIndex = prevIndex + 1;
+      try {
+        const fn = this.output(label, undefined, templateName, name);
+        return fn(...args);
+      } finally {
+        this._options.stackTraceIndex = prevIndex;
+      }
     };
-    this[name] = newMethod;
     return this;
   }
   buffered(label, templateName, options = { mode: "interval" }) {
@@ -469,12 +476,12 @@ class Debuggy {
         if (buffer.length > 0) {
           const flush = [...buffer];
           buffer = [];
-          const parsedStack = this._catchError?.(true) ?? { at: "N/A", file: "", line: 0, column: 0 };
-          callWithSavedStack(parsedStack, flush);
           options.flushCallback?.(flush);
         }
       }, interval);
       const fn = (...args) => {
+        const parsedStack = this._catchError?.(true);
+        callWithSavedStack(parsedStack, ...args);
         buffer.push(args);
       };
       fn.dispose = () => {
@@ -501,7 +508,7 @@ class Debuggy {
       const log = (...args) => {
         if (!active)
           return;
-        const parsedStack = this._catchError?.(true) ?? { at: "N/A", file: "", line: 0, column: 0 };
+        const parsedStack = this._catchError?.(true);
         callWithSavedStack(parsedStack, ...args);
         queue.push(args);
         if (resolveNext) {
