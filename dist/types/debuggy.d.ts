@@ -1,4 +1,4 @@
-import { DebuggyOptions, DebuggyInstance, CreateMethodReturnType } from './types';
+import { DebuggyOptions, DebuggyInstance, CreateMethodReturnType, IntervalLoggerWithDispose, AsyncLoggerWithDispose } from './types';
 export * as utils from './utils';
 /**
  * Main Debuggy class for managing debug logs.
@@ -56,13 +56,13 @@ export declare class Debuggy {
      * @param {string} label A predefined label for the preset method.
      * @param {string} [templateName] The name of the template to use for this method.
      * @returns {this & { [key in T]: (...args: any[]) => void }}
-     *          The debuggy instance with the new preset method added.
+     * The debuggy instance with the new preset method added.
      *
      * @example
      * ```typescript
      * const debug = debuggy
-     *   .preset('log', '<bYh>Log Data<s>')
-     *   .preset('info', '<yGh>Info Data<s>', 'myCustom');
+     * .preset('log', '<bYh>Log Data<s>')
+     * .preset('info', '<yGh>Info Data<s>', 'myCustom');
      *
      * debug.log({ id: 1, message: 'Hello' });
      * debug.info({ id: 2, message: 'World' });
@@ -71,6 +71,22 @@ export declare class Debuggy {
     preset<T extends string>(name: T, label: string, templateName?: string): this & {
         [key in T]: (...args: any[]) => void;
     };
+    /**
+     * Buffered logger helper.
+     *
+     * Provides two buffering modes:
+     *  - "interval": Collects log calls in a buffer and flushes them every N ms.
+     *  - "async": Exposes an async iterable stream that can be consumed with `for await ... of`.
+     *
+     * Supports `.dispose()` to stop interval or clear async queue.
+     */
+    buffered(label: string, templateName?: string, options?: {
+        mode: "interval";
+        interval?: number;
+        flushCallback?: (flushed: any[][]) => void;
+    } | {
+        mode: "async";
+    }): IntervalLoggerWithDispose | AsyncLoggerWithDispose | undefined;
 }
 declare const debuggyInstance: Debuggy;
 export declare const debuggy: DebuggyInstance;

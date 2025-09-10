@@ -153,13 +153,15 @@ var isEnabled = process.env.DEBUG && process.env.DEBUG.toLowerCase() === "debugg
 
 class Debuggy {
   _options;
+  _countMap;
   constructor(options = {}) {
     options = this.normalizeOptions(options);
     this._options = {
-      stackTraceIndex: 3,
+      stackTraceIndex: 2,
       activeTemplate: "default",
       templates: {},
       dateFormatter: undefined,
+      useCounter: true,
       logger: {
         enabled: false,
         saveMethod: undefined
@@ -167,7 +169,14 @@ class Debuggy {
       ...options
     };
     if (isEnabled) {
+      const globalKey = "__debuggy_countMap";
+      if (!(globalKey in globalThis)) {
+        globalThis[globalKey] = new Map;
+      }
+      this._countMap = globalThis[globalKey];
       header(this._options);
+    } else {
+      this._countMap = new Map;
     }
   }
   options(options) {
@@ -181,6 +190,8 @@ class Debuggy {
     }
   }
   normalizeOptions(options) {
+    if (!isEnabled)
+      return options;
     const normalized = { ...options };
     if (options.shows && !options.enabledTags) {
       console.warn('[debuggy] ⚠️ "shows" is deprecated, use "enabledTags" instead.');
@@ -211,18 +222,20 @@ class Debuggy {
     }
     return normalized;
   }
-  catchError(logger = false) {
+  _catchError(buffered = false, logger = false) {
     let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
+    if (!isEnabled)
+      return parsedStack;
     const normalizeForCompare = (p) => p.replace(/\\/g, "/");
     try {
       throw new Error;
     } catch (error) {
       if (error instanceof Error && error.stack) {
-        const stacks = error.stack.split(/\n/m).map((line) => line.trim()).slice(1);
-        const mode = this._options.stackMode ?? "index";
+        const stacks = error.stack.split(/\n/m).map((line) => line.trim()).filter((line) => !line.includes("debuggy.ts") && !line.includes("buffered.ts")).slice(1);
+        const mode = this._options.stackTraceMode ?? "index";
         if ((mode === "filename" || mode === "auto") && typeof __filename === "string") {
           const filenameNorm = normalizeForCompare(__filename);
-          const found = stacks.find((line) => normalizeForCompare(line).includes(filenameNorm));
+          const found = stacks.find((line) => normalizeForCompare(line).includes(filenameNorm + ":"));
           if (found) {
             parsedStack = parseStackTraceLine(found);
             return parsedStack;
@@ -232,8 +245,13 @@ class Debuggy {
           }
         }
         if (mode === "index" || mode === "auto") {
-          const stackIndex = (this._options.stackFileIndex || 2) + (process.versions?.bun ? -1 : 0);
-          const str = stacks[stackIndex + (logger ? 1 : 0)];
+          let stackTraceIndex = this._options.stackTraceIndex || 2;
+          if (logger)
+            stackTraceIndex = process.versions?.bun ? -1 : 0;
+          if (buffered) {
+            stackTraceIndex = stackTraceIndex + 0;
+          }
+          const str = stacks[stackTraceIndex + (logger ? 1 : 0)];
           if (str) {
             parsedStack = parseStackTraceLine(str);
           }
@@ -244,6 +262,8 @@ class Debuggy {
   }
   output(label = "", mode, templateName, level) {
     const { shows, logger } = this._options;
+    if (!isEnabled && !logger?.write)
+      return () => {};
     let prefix = "";
     const tagMatch = /^\[(?<prefix>[A-Z\_\-]+)\]/.exec(label);
     if (tagMatch && tagMatch.groups) {
@@ -255,45 +275,51 @@ class Debuggy {
     const shouldDisplay = isEnabled && isTagAllowed;
     const logToFile = (args) => {
       if (logger?.write && logger.saveMethod && shouldLogToFile) {
-        let parsedStack2 = { at: "N/A", file: "", line: 0, column: 0 };
-        parsedStack2 = this.catchError(true);
-        const logData2 = {
-          label: label || parsedStack2.at,
-          ...parsedStack2,
+        let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
+        parsedStack = this._catchError(true);
+        const logData = {
+          label: label || parsedStack.at,
+          ...parsedStack,
           level: level || "info"
         };
         logger.saveMethod({
           level,
           args: [args[0]],
-          path: logData2.file,
-          ...logData2
+          path: logData.file,
+          ...logData
         });
       }
     };
     if (!shouldDisplay && !shouldLogToFile) {
       return () => {};
     }
-    let templateToUse = templateName || this._options.templateActive;
+    let templateToUse = templateName || this._options.activeTemplate;
     let finalLabel = label;
     let finalMode = mode;
     if (typeof mode === "string" && (mode.includes("%j") || mode.includes("%t") || mode.includes("%log"))) {
       finalLabel = mode.replace(/\%[\w]/ig, "").trim();
       finalMode = mode;
-      templateToUse = this._options.templateActive;
+      templateToUse = this._options.activeTemplate;
     } else if (typeof label === "string" && (label.includes("%j") || label.includes("%t") || label.includes("%log"))) {
       finalMode = label;
       finalLabel = label.replace(/\%[\w]+/ig, "").trim();
     }
-    let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
-    parsedStack = this.catchError();
-    const logData = {
-      label: finalLabel || parsedStack.at,
-      ...parsedStack,
-      level: level || "info"
-    };
     return (...args) => {
+      let parsedStack = { at: "N/A", file: "", line: 0, column: 0 };
+      parsedStack = this._catchError();
+      const logData = {
+        label: finalLabel || parsedStack.at,
+        ...parsedStack,
+        level: level || "info"
+      };
+      let counter = 0;
+      if (this._options.useCounter) {
+        counter = (this._countMap.get(label) || 0) + 1;
+        logData.count = counter;
+        this._countMap.set(label, counter);
+      }
       if (shouldDisplay) {
-        this.displayLog({
+        this._displayLog({
           label: finalLabel,
           args,
           mode: finalMode,
@@ -316,7 +342,7 @@ class Debuggy {
     console.log(tpl(`<hy>---------------------<s>`, { executedTime }));
     console.log(tpl(`<hy>executed time: <hw>{executedTime}ms`, { executedTime }));
   }
-  displayLog({ label, args, mode, templateName, data }) {
+  _displayLog({ label, args, mode, templateName, data }) {
     const { templates, dateFormatter } = this._options;
     const sanitizedLabel = typeof label === "string" ? label.replace("%log", "").trim() : label;
     const sanitizedMode = typeof mode === "string" ? mode.replace("%log", "").trim() : mode;
@@ -334,14 +360,14 @@ class Debuggy {
       activeTemplate.all(templateParams);
     } else {
       if (!activeTemplate || !activeTemplate.head) {
-        console.log(tpl(`<hy>####### <s><h>{label}`, data));
+        console.log(tpl(`<hy>####### <s><h>{label}<s>`, data));
         if (data.at && data.at !== "N/A") {
-          console.log(tpl(`<hg>at<s>    : <hc>{at}`, data));
+          console.log(tpl(`<hg>at<s>    : <hc>{at}<s>`, data));
         }
-        console.log(tpl(`<hg>file<s>  : <hm>{file}`, data));
+        console.log(tpl(`<hg>file<s>  : <hm>{file}<s>`, data));
         console.log(tpl(`<hg>line<s>  : <hw>{line}<s>`, data));
         console.log(tpl(`<hg>tspan<s> : <h>{datetime}<s>`, {}));
-        console.log(tpl(`---------------------------------------`, {}));
+        console.log(tpl(`--------------------------------------- ${this._options.useCounter ? "<yh>+{count}<s>" : ""}`, data));
       } else {
         activeTemplate.head(templateParams);
       }
@@ -404,6 +430,96 @@ class Debuggy {
     this[name] = newMethod;
     return this;
   }
+  buffered(label, templateName, options = { mode: "interval" }) {
+    if (!isEnabled) {
+      if (!options || options.mode === "interval") {
+        const dummy = () => {};
+        dummy.dispose = () => {};
+        return dummy;
+      }
+      if (options.mode === "async") {
+        const dummy = {
+          log: () => {},
+          stream: async function* () {}(),
+          dispose: () => {}
+        };
+        return dummy;
+      }
+    }
+    const callWithSavedStack = (stack, ...args) => {
+      const logData = { label, ...stack, level: "info" };
+      let counter = 0;
+      if (this._options.useCounter) {
+        counter = (this._countMap.get(label) || 0) + 1;
+        logData.count = counter;
+        this._countMap.set(label, counter);
+      }
+      this._displayLog({
+        label,
+        args,
+        mode: undefined,
+        templateName: templateName || "default",
+        data: logData
+      });
+    };
+    if (options.mode === "interval") {
+      let buffer = [];
+      const interval = options.interval ?? 1000;
+      const timer = setInterval(() => {
+        if (buffer.length > 0) {
+          const flush = [...buffer];
+          buffer = [];
+          const parsedStack = this._catchError?.(true) ?? { at: "N/A", file: "", line: 0, column: 0 };
+          callWithSavedStack(parsedStack, flush);
+          options.flushCallback?.(flush);
+        }
+      }, interval);
+      const fn = (...args) => {
+        buffer.push(args);
+      };
+      fn.dispose = () => {
+        clearInterval(timer);
+        buffer = [];
+      };
+      return fn;
+    }
+    if (options.mode === "async") {
+      const queue = [];
+      let resolveNext = null;
+      let active = true;
+      async function* generator() {
+        while (active) {
+          if (queue.length === 0) {
+            await new Promise((resolve) => resolveNext = resolve);
+          }
+          while (queue.length > 0) {
+            yield queue.shift();
+          }
+        }
+      }
+      const gen = generator();
+      const log = (...args) => {
+        if (!active)
+          return;
+        const parsedStack = this._catchError?.(true) ?? { at: "N/A", file: "", line: 0, column: 0 };
+        callWithSavedStack(parsedStack, ...args);
+        queue.push(args);
+        if (resolveNext) {
+          resolveNext();
+          resolveNext = null;
+        }
+      };
+      const dispose = () => {
+        active = false;
+        queue.length = 0;
+        if (resolveNext) {
+          resolveNext();
+          resolveNext = null;
+        }
+      };
+      return { log, stream: gen, dispose };
+    }
+  }
 }
 var debuggyInstance = new Debuggy;
 function debuggyWithLevel(label = "", mode, templateName) {
@@ -418,7 +534,8 @@ Object.assign(debuggyWithLevel, {
     };
   },
   create: debuggyInstance.create.bind(debuggyInstance),
-  preset: debuggyInstance.preset.bind(debuggyInstance)
+  preset: debuggyInstance.preset.bind(debuggyInstance),
+  buffered: debuggyInstance.buffered.bind(debuggyInstance)
 });
 var debuggy = debuggyWithLevel;
 var debuggy_default = debuggy;

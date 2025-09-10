@@ -1,6 +1,6 @@
 {
   "name": "@en32/debuggy",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "A simple debug logger.",
   "main": "dist/debuggy.js",
   "module": "src/debuggy.ts",

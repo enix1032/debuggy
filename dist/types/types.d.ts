@@ -22,6 +22,16 @@ export interface DebuggyOptions {
      */
     activeTemplate?: string;
     /**
+     * Enables a per-label counter.
+     *
+     * When `true`, each label keeps an internal counter that increments
+     * every time the label is used. The counter value is available in
+     * templates via the `{count}` token.
+     *
+     * @default true
+     */
+    useCounter?: boolean;
+    /**
      * Template definitions for customizing log output.
      */
     templates?: {
@@ -85,12 +95,37 @@ export interface DebuggyOptions {
  * Interface for the template parameters.
  */
 export interface TemplateParams {
+    /**
+     * Utility function to render a string with ANSI color tags and tokens.
+     */
     template: (text: string, tokens: any) => string;
+    /**
+     * Tokens available for substitution in templates.
+     *
+     * Includes all fields from `LogData` plus special tokens:
+     * - `{datetime}` → formatted date/time string
+     * - `{count}`    → per-label counter (only if `useCounter: true`)
+     */
     tokens: any;
+    /**
+     * The label of the current log.
+     */
     label: string;
+    /**
+     * The output mode, e.g. `%j`, `%t`, or custom format.
+     */
     mode: string | string[];
+    /**
+     * The arguments passed to the log call.
+     */
     args: any[];
+    /**
+     * Structured log data including file, line, column, etc.
+     */
     data: LogData;
+    /**
+     * Execution time of the log rendering in milliseconds (if measured).
+     */
     executedTime?: string;
 }
 /**
@@ -105,6 +140,7 @@ export interface LogData {
     file: string;
     line: number;
     column: number;
+    count?: number;
 }
 /**
  * Return type for the `create` method to allow method chaining.
@@ -136,4 +172,33 @@ export interface DebuggyInstance {
     label: LabelFn;
     create: CreateFn;
     preset: PresetFn;
+    buffered(label: string, templateName?: string): IntervalLoggerWithDispose;
+    buffered(label: string, templateName: string | undefined, options: {
+        mode: "interval";
+        interval?: number;
+        flushCallback?: (flushed: any[][]) => void;
+    }): IntervalLoggerWithDispose;
+    buffered(label: string, templateName: string | undefined, options: {
+        mode: "async";
+    }): AsyncLoggerWithDispose;
+    buffered(label: string, templateName?: string, options?: {
+        mode: "interval";
+        interval?: number;
+        flushCallback?: (flushed: any[][]) => void;
+    } | {
+        mode: "async";
+    }): IntervalLoggerWithDispose | AsyncLoggerWithDispose;
 }
+export type IntervalLogger = (...args: any[]) => void;
+export type AsyncLogger = {
+    log: (...args: any[]) => void;
+    stream: AsyncGenerator<any>;
+};
+export type IntervalLoggerWithDispose = ((...args: any[]) => void) & {
+    dispose: () => void;
+};
+export type AsyncLoggerWithDispose = {
+    log: (...args: any[]) => void;
+    stream: AsyncGenerator<any>;
+    dispose: () => void;
+};

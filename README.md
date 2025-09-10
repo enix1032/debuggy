@@ -161,32 +161,143 @@ debuggy('Custom Log Example')('Hello from custom template!');
 debuggy('Full Custom Template', 'full')('This log uses the "full" template.');
 ```
 
-### Buffered Logging (Experimental)
+### Buffered Logger (Experimental)
 
-```typescript
-import { buffered } from '@en32/debuggy/buffered';
+The `buffered()` helper allows you to batch or stream logs before flushing them.
+It supports two modes:
 
-// Interval mode: collect logs and flush every 2 seconds
-const warn = buffered('<hYb>WARNING<s>', 'myCustom', { mode: 'interval', interval: 2000 });
-for (let i = 0; i < 5; i++) {
-  warn({ id: i, msg: `batched warning ${i}` });
-}
+* **Interval mode** → Collects logs in a buffer and flushes every N milliseconds.
+* **Async mode** → Exposes an async iterable stream, consumed with `for await ... of`.
 
-// Async mode: stream logs
-const { log: errorLog, stream } = buffered('<rh>ERROR<s>', 'myCustom', { mode: 'async' });
+Both modes support `.dispose()` to stop intervals or clear the async queue.
+
+---
+
+#### 1. Default → Interval Mode (no `options`)
+
+```ts
+// Default mode is "interval" with 1000ms interval
+const warn = debuggy.buffered("<hYb>WARN<s>", "default");
+
 for (let i = 0; i < 3; i++) {
-  errorLog({ id: i, msg: `async error ${i}` });
+  warn({ msg: `batch ${i}` });
 }
 
-(async () => {
-  for await (const entry of stream) {
-    console.log('>>> Stream received:', entry);
-    break;
-  }
-})();
+// stop after 5 seconds
+setTimeout(() => warn.dispose(), 5000);
 ```
 
-### Inline SQL Example (Utility)
+---
+
+#### 2. Interval Mode with custom interval
+
+```ts
+// Flush every 2 seconds
+const info = debuggy.buffered("<hc>INFO<s>", "custom", {
+  mode: "interval",
+  interval: 2000,
+});
+
+info({ user: "Alice" });
+info({ user: "Bob" });
+```
+
+---
+
+#### 3. Interval Mode with flush callback
+
+```ts
+const audit = debuggy.buffered("<hy>AUDIT<s>", "audit", {
+  mode: "interval",
+  interval: 1500,
+  flushCallback(flushed) {
+    console.log("Flushed batch:", flushed);
+  },
+});
+
+audit({ id: 1 });
+audit({ id: 2 });
+audit({ id: 3 });
+```
+
+---
+
+#### 4. Async Mode (consumed via `for await ... of`)
+
+```ts
+const asyncLogger = debuggy.buffered("<hg>ASYNC<s>", "streaming", {
+  mode: "async",
+});
+
+// consumer
+(async () => {
+  for await (const entry of asyncLogger.stream) {
+    console.log("Async batch:", entry);
+  }
+})();
+
+// producer
+asyncLogger.log({ step: "start" });
+asyncLogger.log({ step: "processing" });
+```
+
+---
+
+#### 5. Async Mode with multiple consumers
+
+```ts
+const asyncLog = debuggy.buffered("<hc>ASYNC_MULTI<s>", "stream", { mode: "async" });
+
+// consumer 1
+(async () => {
+  for await (const entry of asyncLog.stream) {
+    console.log("Consumer 1 got:", entry);
+  }
+})();
+
+// consumer 2
+(async () => {
+  for await (const entry of asyncLog.stream) {
+    console.log("Consumer 2 got:", entry);
+  }
+})();
+
+asyncLog.log({ event: "init" });
+asyncLog.log({ event: "done" });
+```
+
+> ⚠️ Note: `AsyncGenerator` can only be consumed once.
+> The second consumer will not receive data.
+
+---
+
+#### 6. Disabled Mode (`isEnabled = false`)
+
+```ts
+// when DEBUG environment is disabled
+const noopLogger = debuggy.buffered("<hx>NOOP<s>", "disabled");
+
+noopLogger({ will: "not log" }); // safe, no output
+noopLogger.dispose(); // safe as well
+```
+
+---
+
+#### 7. Auto dispose after usage
+
+```ts
+const batchLog = debuggy.buffered("<hb>BATCH<s>", "temp", { mode: "interval", interval: 500 });
+
+batchLog({ a: 1 });
+batchLog({ a: 2 });
+
+setTimeout(() => {
+  batchLog.dispose(); // stop the interval
+  console.log("Batch logger disposed");
+}, 2000);
+```
+
+#### Inline SQL Example (Utility)
 
 ```typescript
 import { inlineString } from '@en32/debuggy/utils';
@@ -239,9 +350,11 @@ For more examples, please refer to the [`./examples`](https://github.com/enix103
 
 Main debug function. Returns a function to log the actual arguments.
 
-  * `label` (string, optional): A label for the log entry.
-  * `mode` (string | string[], optional): Formatting string(s) like `'%t'`, `'%j'`, `'%log'`.
-  * `templateName` (string, optional): The name of a custom template.
+  * `label` (`string`, optional): A label for the log entry.
+  * `mode` (`string | string[]`, optional): Formatting string(s) like `'%t'`, `'%j'`, `'%log'`.
+  * `templateName` (`string`, optional): The name of a custom template.
+
+---
 
 ### `debuggy.options(options)`
 
@@ -251,21 +364,51 @@ Update the global configuration.
   * `activeTemplate`: Default template.
   * `templates`: Custom template definitions.
   * `dateFormatter`: Custom date formatter.
-  * `stackTraceIndex`: Index for stack trace (number).
-  * `stackTraceMode`: _index_, _filename_, or _auto_ (string).
-  * `logger`: File logging config.
+  * `stackTraceIndex`: Index for stack trace (`number`).
+  * `stackTraceMode`: `"index"`, `"filename"`, or `"auto"`.
+  * `logger`: File logging configuration.
+
+---
 
 ### `debuggy.create(name, label, templateName?)`
 
 Add a reusable custom method.
 
+---
+
 ### `debuggy.label(label)`
 
 Create a shortcut function with a fixed label.
 
+---
+
 ### `debuggy.preset(name, label, templateName?)`
 
 Create a reusable one-step method (`method(data)`).
+
+---
+
+### `debuggy.buffered(label, templateName?, options?)`
+
+Buffered logger helper. Provides two modes:
+
+- **Interval mode**: Collects log calls in a buffer and flushes them every N ms.  
+- **Async mode**: Exposes an async iterable stream that can be consumed with `for await ... of`.  
+
+Both modes support `.dispose()` to stop interval or clear async queue.
+
+**Parameters:**
+  * `label` (`string`): A label for the log entry.
+  * `templateName` (`string`, optional): The name of a custom template (default: `"default"`).
+  * `options`:
+    - `{ mode: "interval"; interval?: number; flushCallback?: (flushed: any[][]) => void }`  
+      Collects logs and flushes in batches every interval (ms).
+    - `{ mode: "async" }`  
+      Creates an async logger with `.log()` and `.stream`.
+
+**Returns:**
+  * In **interval mode** → A callable function `(...args) => void` with `.dispose()`.  
+  * In **async mode** → An object `{ log, stream, dispose }`.
 
 -----
 
@@ -348,46 +491,37 @@ This project is licensed under the **MIT License**.
 ### ./examples/ts/buffered.ts
 
 ```typescript
-import { buffered } from "@en32/debuggy/buffered";
+import debuggy from "@en32/debuggy";
 
-// --- Interval mode example ---
-const warn = buffered("<hYb>WARNING<s>", "myCustom", { mode: "interval", interval: 2000 });
+const warn = debuggy.buffered("<hYb>WARNING<s>", "myCustom", {
+  mode: "interval",
+  interval: 2000,
+});
 
-// Push multiple logs quickly → they will be flushed together every 2 seconds
 for (let i = 0; i < 5; i++) {
   warn({ id: i, msg: `batched warning ${i}` });
 }
 
-// --- Async mode example ---
-const { log: errorLog, stream } = buffered("<rh>ERROR<s>", "myCustom", { mode: "async" });
+// berhentikan interval & bersihkan buffer
+setTimeout(() => {
+  warn.dispose();
+}, 10000);
 
-// Produce logs
-for (let i = 0; i < 3; i++) {
-  errorLog({ id: i, msg: `async error ${i}` });
-}
+const asyncLogger = debuggy.buffered("<hg>ASYNC<s>", "default", { mode: "async" });
 
-// Consume logs as an async stream
 (async () => {
-  console.log("--- Start consuming async stream ---");
-  let count = 0;
-  for await (const entry of stream) {
-    console.log(">>> Stream received:", entry);
-    count++;
-    if (count >= 3) {
-      console.log("--- Stopping async consumer ---");
-      break; // stop after 3 entries
-    }
+  for await (const entry of asyncLogger.stream) {
+    console.log("Received:", entry);
   }
 })();
 
-// Auto-stop after first interval flush
-setTimeout(() => {
-  console.log("\n=== Interval flush should have happened above ===");
-  console.log("--- Exiting now ---\n");
-  process.exit(0);
-}, 2500);
+asyncLogger.log({ foo: 1 });
+asyncLogger.log({ foo: 2 });
 
-/** Bug in BunJS runtime. */
+// hentikan stream
+setTimeout(() => {
+  asyncLogger.dispose();
+}, 5000);
 
 ```
 ---
