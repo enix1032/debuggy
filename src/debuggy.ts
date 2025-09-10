@@ -156,7 +156,7 @@ export class Debuggy {
         }
 
         const logger = this._options.logger?.enabled
-        console.log(logger)
+
         // --- Mode: index / auto fallback ---
         if (mode === "index" || mode === "auto") {
           let stackTraceIndex = this._options.stackTraceIndex || 2
